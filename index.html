@@ -1,0 +1,663 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b1020">
+<title>MoneyPro — Gestion Mobile Money</title>
+<style>
+:root{--bg:#f4f6fa;--card:#fff;--ink:#101828;--muted:#667085;--line:#e4e7ec;--blue:#155eef;--blue2:#0b4acb;--green:#12b76a;--red:#f04438;--orange:#f79009;--nav:#0b1020;--shadow:0 10px 30px #10182812}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:none!important}
+.auth{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(135deg,#07111f,#12346b)}
+.auth-card{width:min(470px,100%);background:#fff;border-radius:22px;padding:28px;box-shadow:0 25px 70px #0005}.logo{font-size:25px;font-weight:900}.logo span{color:#155eef}.auth-card h1{font-size:25px;margin:24px 0 7px}.auth-card>p{font-size:13px;color:var(--muted);margin:0 0 20px}.tabs{display:flex;background:#f2f4f7;padding:4px;border-radius:11px;margin-bottom:18px}.tabs button{flex:1;border:0;background:transparent;border-radius:8px;padding:10px}.tabs button.active{background:#fff;box-shadow:0 1px 5px #0001;font-weight:700}.field{display:flex;flex-direction:column;gap:6px;margin-bottom:13px}.field label{font-size:12px;font-weight:700;color:#344054}.field input,.field select,.field textarea{width:100%;padding:11px 12px;border:1px solid #d0d5dd;border-radius:10px;background:#fff;outline:0}.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px #155eef14}.btn{border:0;border-radius:10px;background:var(--blue);color:#fff;padding:11px 15px;font-weight:750}.btn:hover{background:var(--blue2)}.btn.secondary{background:#eef4ff;color:var(--blue)}.btn.gray{background:#f2f4f7;color:#344054}.btn.danger{background:#fff0ef;color:#b42318}.btn.small{padding:8px 10px;font-size:12px}.auth-actions{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:4px}.link{border:0;background:none;color:var(--blue);padding:0;font-size:12px}.msg{font-size:12px;margin-top:10px}.success{color:#087443}.error{color:#b42318}
+.app{min-height:100vh;display:flex}.sidebar{position:fixed;left:0;top:0;bottom:0;width:245px;background:var(--nav);color:#fff;padding:20px 14px;z-index:30}.brand{font-size:21px;font-weight:900;padding:6px 10px 20px}.brand span{color:#66a3ff}.user-mini{background:#151e35;border-radius:12px;padding:11px;margin-bottom:13px;font-size:12px}.user-mini b{display:block;margin-bottom:4px}.nav button{display:flex;width:100%;border:0;background:transparent;color:#cbd5e1;padding:11px 12px;border-radius:10px;margin:3px 0;text-align:left;gap:10px}.nav button.active,.nav button:hover{background:#17213b;color:#fff}.side-bottom{position:absolute;left:14px;right:14px;bottom:18px}.main{margin-left:245px;width:calc(100% - 245px);padding:22px;max-width:1650px}.top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px}.top-left{display:flex;align-items:center;gap:10px}.top h1{margin:0;font-size:25px}.status{font-size:11px;color:var(--muted);margin-top:3px}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:5px}.mobile-menu{display:none;border:1px solid var(--line);background:#fff;border-radius:9px;padding:8px}
+.page{display:none}.page.active{display:block}.grid{display:grid;gap:15px}.cards{grid-template-columns:repeat(2,1fr)}.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:17px;box-shadow:var(--shadow)}.metric{font-size:11px;color:var(--muted)}.value{font-size:25px;font-weight:850;margin:7px 0}.sub{font-size:11px;color:var(--muted)}.positive{color:var(--green)}.negative{color:var(--red)}.sections{grid-template-columns:1.4fr 1fr;margin-top:15px}.section-title{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px}.section-title h2,.card h2{font-size:17px;margin:0}.table-wrap{overflow:auto}.table{width:100%;border-collapse:collapse;font-size:12px}.table th,.table td{padding:11px 7px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}.table th{font-size:10px;color:var(--muted);text-transform:uppercase}.badge{display:inline-flex;align-items:center;padding:4px 7px;border-radius:999px;background:#eef4ff;color:var(--blue);font-size:10px;font-weight:750}.badge.green{background:#ecfdf3;color:#087443}.badge.red{background:#fff0ef;color:#b42318}.badge.orange{background:#fff7e8;color:#b54708}.wallets{grid-template-columns:repeat(2,minmax(0,1fr))}.list-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.movement-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 18px}.wallet{border:1px solid var(--line);border-radius:14px;padding:15px}.wallet strong{font-size:13px}.wallet .amount{font-size:21px;font-weight:850;margin-top:8px}.toolbar{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:14px}.toolbar input,.toolbar select{padding:9px 10px;border:1px solid var(--line);border-radius:9px;background:#fff}.form-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:13px}.full{grid-column:1/-1}.actions{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}.notice{padding:13px;border-radius:12px;background:#eef4ff;color:#194185;font-size:12px}.warning{background:#fff7e8;color:#8a4b08}.empty{text-align:center;padding:28px;color:var(--muted)}.modal{position:fixed;inset:0;background:#10182899;display:none;align-items:center;justify-content:center;padding:18px;z-index:80}.modal.open{display:flex}.modal-box{background:#fff;width:min(650px,100%);max-height:93vh;overflow:auto;border-radius:18px;padding:20px}.modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}.modal-head h3{margin:0}.close{width:33px;height:33px;border:0;background:#f2f4f7;border-radius:50%}.plan{border:1px solid var(--line);border-radius:15px;padding:17px}.plan.active{border:2px solid var(--blue)}.plan h3{margin:0 0 6px}.plan-price{font-size:23px;font-weight:850}.plan small{color:var(--muted)}.stat-row{display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding:10px 0;font-size:13px}.kpi{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.report-stat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:15px}.report-stat-card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px}.report-stat-card h3{font-size:14px;margin:0 0 10px}.report-op-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.report-op-item{border:1px solid var(--line);border-radius:10px;padding:10px;text-align:center}.report-op-item span{display:block;font-size:10px;color:var(--muted);margin-bottom:4px}.report-op-item b{font-size:20px}.subscription{border-radius:16px;background:linear-gradient(135deg,#0b1020,#17376d);color:#fff;padding:20px}.subscription .muted{color:#cbd5e1}.footer-note{text-align:center;color:var(--muted);font-size:10px;margin-top:18px}
+@media(max-width:1050px){.cards{grid-template-columns:repeat(2,1fr)}.wallets{grid-template-columns:repeat(2,minmax(0,1fr))}.list-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.movement-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.sections{grid-template-columns:1fr}.sidebar{width:215px}.main{margin-left:215px;width:calc(100% - 215px)}}
+@media(max-width:700px){.sidebar{transform:translateX(-100%);transition:.2s;width:245px}.sidebar.open{transform:translateX(0)}.main{margin-left:0;width:100%;padding:14px}.mobile-menu{display:block}.top h1{font-size:20px}.cards,.wallets,.kpi,.report-stat-grid{grid-template-columns:1fr 1fr}.form-grid{grid-template-columns:1fr}.full{grid-column:auto}.card{padding:14px}.value{font-size:20px}.top>.btn{display:none}}
+
+.day-lock{padding:14px;border-radius:12px;background:#fff7e8;color:#8a4b08;margin-bottom:14px}.phone-actions{display:flex;gap:8px;align-items:center}.merchant-agent-only{display:none}.phone-actions input{flex:1}.icon-btn{width:44px;height:44px;border:0;border-radius:12px;background:#111;color:#fff;font-size:20px;cursor:pointer}.icon-btn:hover{opacity:.9}
+.day-actions{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}.day-actions button{flex:1;min-width:150px}.role-badge{display:inline-block;padding:5px 9px;border-radius:999px;background:#eee;font-size:12px}.locked{opacity:.55;pointer-events:none}.agent-history-note{padding:12px;border-radius:12px;background:#f6f6f6;margin:10px 0}
+</style>
+</head>
+<body>
+
+<!-- AUTHENTIFICATION -->
+<div id="authScreen" class="auth">
+  <div class="auth-card">
+    <div class="logo">Money<span>Pro</span></div>
+    <h1 id="authTitle">Créer votre compte</h1>
+    <p id="authSubtitle">Gérez vos opérations Mobile Money, votre caisse et votre stock.</p>
+
+    <div class="tabs">
+      <button id="tabSignup" class="active" onclick="authView('signup')">Inscription</button>
+      <button id="tabLogin" onclick="authView('login')">Connexion</button>
+    </div>
+
+    <form id="signupForm">
+      <div class="field"><label>Nom du marchand / entreprise</label><input id="suShop" required placeholder="Ex. Boutique Pedro"></div>
+      <div class="field"><label>Nom complet</label><input id="suName" required placeholder="Votre nom"></div>
+      <div class="field"><label>Téléphone</label><input id="suPhone" required placeholder="+229..."></div>
+      <div class="field"><label>Email</label><input id="suEmail" type="email" required placeholder="email@exemple.com"></div>
+      <div class="field"><label>Mot de passe</label><input id="suPass" type="password" minlength="6" required></div>
+      <div class="field"><label>Confirmer le mot de passe</label><input id="suPass2" type="password" minlength="6" required></div>
+      <button class="btn" style="width:100%">Créer mon compte</button>
+    </form>
+
+    <form id="loginForm" class="hidden">
+      <div class="field"><label>Email du compte</label><input id="liEmail" type="email" required></div>
+      <div class="field"><label>Mot de passe</label><input id="liPass" type="password" required></div>
+      <div class="auth-actions"><button type="button" class="link" onclick="authView('forgot')">Mot de passe oublié ?</button><button class="btn">Se connecter</button></div>
+    </form>
+
+    <form id="forgotForm" class="hidden">
+      <div class="notice">Entrez l'adresse email de votre compte. En production, Supabase enverra automatiquement le lien sécurisé de réinitialisation.</div>
+      <div class="field" style="margin-top:13px"><label>Email</label><input id="forgotEmail" type="email" required></div>
+      <button class="btn" style="width:100%">Envoyer le lien</button>
+      <div style="text-align:center;margin-top:12px"><button type="button" class="link" onclick="authView('login')">← Retour à la connexion</button></div>
+    </form>
+    <div id="authMsg" class="msg"></div>
+    <div class="footer-note">Mode de démonstration local disponible avant la création de Supabase.</div>
+    <button class="btn secondary" style="width:100%;margin-top:14px" onclick="demoLogin()">Tester l'application en mode démo</button>
+  </div>
+</div>
+
+<!-- APPLICATION -->
+<div id="app" class="app hidden">
+<aside id="sidebar" class="sidebar">
+  <div class="brand">Money<span>Pro</span></div>
+  <div class="user-mini"><b id="sideName">Marchand</b><span id="sideRole">Marchand</span></div>
+  <nav class="nav">
+    <button data-page="dashboard" class="active">📊 Tableau de bord</button>
+    <button data-page="operations">💸 Opérations</button>
+    <button data-page="wallets">👛 Portefeuilles</button>
+    <button data-page="expenses">🧾 Dépenses</button>
+    <button data-page="inventory">📦 Inventaire</button>
+    <button data-page="agents">👥 Agents</button>
+    <button data-page="reports">📈 Rapports</button>
+    <button data-page="subscription">💳 Abonnement</button>
+    <button data-page="settings">⚙️ Paramètres</button>
+  </nav>
+  <div class="side-bottom"><button class="btn secondary" style="width:100%" onclick="logout()">Déconnexion</button></div>
+</aside>
+
+<main class="main">
+<div class="top">
+  <div class="top-left"><button class="mobile-menu" onclick="toggleSidebar()">☰</button><div><h1 id="pageTitle">Tableau de bord</h1><div class="status"><span class="dot"></span><span id="connectionText">Mode local — synchronisation à venir</span></div></div></div>
+  <button id="newOperationBtn" class="btn" onclick="openOperation()">+ Nouvelle opération</button>
+</div>
+
+<section id="dashboard" class="page active">
+  <div class="grid cards">
+    <div class="card"><div class="metric">Total en caisse + opérateurs</div><div class="value" id="totalBalance">0 F</div><div class="sub">Solde actuel</div></div>
+    <div class="card"><div class="metric">Espèces</div><div class="value" id="cashBalance">0 F</div><div class="sub">Caisse physique</div></div>
+    <div class="card"><div class="metric">Opérations aujourd'hui</div><div class="value" id="todayOps">0</div><div class="sub" id="todayVolume">0 F</div></div>
+    <div class="card"><div class="metric">Commissions saisies</div><div class="value positive" id="todayFees">0 F</div><div class="sub">Saisie manuellement</div></div>
+  </div>
+  <div class="grid sections">
+    <div class="card"><div class="section-title"><h2>Dernières opérations</h2><button class="btn secondary small" onclick="showPage('operations')">Tout voir</button></div><div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Type</th><th>Compte</th><th>Montant</th><th>Commission</th></tr></thead><tbody id="recentOps"></tbody></table></div></div>
+    <div class="card"><div class="section-title"><h2>Portefeuilles</h2><button class="btn secondary small" onclick="showPage('wallets')">Détails</button></div><div id="dashWallets" class="list-grid"></div></div>
+  </div>
+  <div class="subscription" style="margin-top:15px"><div class="muted" style="font-size:11px">ABONNEMENT MARCHAND</div><div style="font-size:21px;font-weight:850;margin:5px 0" id="dashSubStatus">Actif</div><div class="muted" id="dashSubDate">—</div></div>
+</section>
+
+<section id="dayManagement" class="section">
+<h2>Journée de travail</h2>
+<div id="dayStatus" class="card">Journée non ouverte.</div><div id="agentReturnBar" class="notice" style="display:none;margin-top:10px"><b>Mode agent</b> — vous consultez uniquement le compte de cet agent. <button class="btn small" onclick="switchToMerchant();showApp()">Retour au compte marchand</button></div>
+<div class="day-actions">
+<button type="button" onclick="openDayEntry()">Ouvrir la journée</button>
+<button type="button" onclick="closeDayEntry()">Clôturer la journée</button>
+</div>
+<div id="dayEntryPanel" class="card" style="display:none">
+<h3 id="dayEntryTitle">Ouverture de journée</h3>
+<p>Saisissez les soldes disponibles au début de la journée.</p>
+<div class="grid">
+<label>MTN<input id="openingMTN" type="number" min="0" step="1" value="0"></label>
+<label>Moov<input id="openingMoov" type="number" min="0" step="1" value="0"></label>
+<label>Celtiis<input id="openingCeltiis" type="number" min="0" step="1" value="0"></label>
+<label>Espèces<input id="openingCash" type="number" min="0" step="1" value="0"></label>
+</div>
+<button type="button" onclick="saveDayOpening()">Enregistrer l'ouverture</button>
+</div>
+</section>
+<section id="operations" class="page">
+<div class="card">
+  <div id="dayStartNotice"></div>
+  <div class="section-title"><h2>Journal des mouvements</h2><button class="btn" onclick="openOperation()">+ Ajouter</button></div>
+  <div class="notice" style="margin-bottom:14px"><b>Règle de caisse :</b> dépôt, vente de crédit et vente de forfait diminuent le compte opérateur et augmentent les espèces. Un retrait fait l'inverse. Les commissions sont toujours saisies manuellement.</div>
+  <div class="toolbar"><input id="opSearch" placeholder="Rechercher..." oninput="renderOperations()"><select id="opFilter" onchange="renderOperations()"><option value="">Tous les types</option><option>Dépôt</option><option>Retrait</option><option>Vente de crédit</option><option>Vente de forfait</option></select><select id="netFilter" onchange="renderOperations()"><option value="">Tous les comptes</option><option>MTN</option><option>Moov</option><option>Celtiis</option></select></div>
+  <div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>ID transaction</th><th>Type</th><th>Opérateur</th><th>Client</th><th>Montant</th><th>Commission</th><th>Agent</th><th>Observation</th><th></th></tr></thead><tbody id="opsTable"></tbody></table></div>
+</div>
+</section>
+
+<section id="wallets" class="page">
+<div class="card"><div class="section-title"><h2>Portefeuilles</h2></div><div id="walletsList" class="wallets"></div></div>
+<div class="card" style="margin-top:15px"><div class="section-title"><h2>Principe des mouvements</h2></div><div class="movement-grid"><div class="stat-row"><span>Dépôt</span><b>Opérateur − / Espèces +</b></div><div class="stat-row"><span>Vente de crédit</span><b>Opérateur − / Espèces +</b></div><div class="stat-row"><span>Vente de forfait</span><b>Opérateur − / Espèces +</b></div><div class="stat-row"><span>Retrait</span><b>Opérateur + / Espèces −</b></div></div></div>
+</section>
+
+<section id="expenses" class="page">
+<div class="card"><div class="section-title"><h2>Dépenses</h2><button class="btn" onclick="openExpense()">+ Dépense</button></div><div class="grid cards" style="grid-template-columns:repeat(2,minmax(0,1fr));margin-bottom:15px"><div class="card"><div class="metric">Aujourd'hui</div><div class="value negative" id="expToday">0 F</div></div><div class="card"><div class="metric">Ce mois</div><div class="value negative" id="expMonth">0 F</div></div><div class="card"><div class="metric">Nombre</div><div class="value" id="expCount">0</div></div></div><div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Catégorie</th><th>Montant</th><th>Observation</th><th></th></tr></thead><tbody id="expensesTable"></tbody></table></div></div>
+</section>
+
+<section id="inventory" class="page">
+<div class="card"><div class="section-title"><h2>Inventaire</h2><button class="btn" onclick="openProduct()">+ Produit</button></div><div class="toolbar"><input id="prodSearch" placeholder="Rechercher..." oninput="renderInventory()"></div><div class="table-wrap"><table class="table"><thead><tr><th>Produit</th><th>Stock</th><th>Seuil</th><th>Achat</th><th>Vente</th><th>Valeur</th><th></th></tr></thead><tbody id="inventoryTable"></tbody></table></div></div>
+</section>
+
+<div id="agentAccessRules" class="agent-history-note"><strong>Accès agent :</strong> chaque agent se connecte avec les identifiants fournis par le marchand. Un agent ne voit que ses propres opérations et son historique. Si son abonnement est expiré, il conserve l'accès à son historique mais ne peut plus effectuer d'opérations.</div>
+<section id="agents" class="page">
+<div class="card"><div class="section-title"><h2>Agents</h2><button class="btn" onclick="openAgent()">+ Nouvel agent</button></div><div class="notice">Chaque agent possède son propre compte et son propre abonnement de <b>500 F CFA/mois</b>, séparé de l'abonnement du marchand.</div><div class="table-wrap" style="margin-top:14px"><table class="table"><thead><tr><th>Agent</th><th>Téléphone</th><th>Statut</th><th>Abonnement</th><th>Actions</th></tr></thead><tbody id="agentsTable"></tbody></table></div></div>
+</section>
+
+<section id="reports" class="page">
+<div class="grid sections"><div class="card"><h2>Synthèse</h2><div id="reportSummary" class="report-stat-grid"></div></div><div class="card"><h2>Types d'opérations</h2><div id="reportTypes" class="report-stat-grid"></div></div></div>
+<div class="report-stat-grid">
+  <div class="report-stat-card"><h3>📥 Dépôts par opérateur</h3><div id="reportDeposits" class="report-op-grid"></div></div>
+  <div class="report-stat-card"><h3>📤 Retraits par opérateur</h3><div id="reportWithdrawals" class="report-op-grid"></div></div>
+  <div class="report-stat-card"><h3>📱 Ventes de crédit par opérateur</h3><div id="reportCredits" class="report-op-grid"></div></div>
+  <div class="report-stat-card"><h3>📦 Ventes de forfait par opérateur</h3><div id="reportBundles" class="report-op-grid"></div></div>
+</div>
+<div class="card" style="margin-top:15px"><h2>Traçabilité</h2><p style="font-size:12px;color:var(--muted)">Chaque mouvement est lié à un agent, une date, un compte opérateur, un montant, une commission saisie et une observation. En production, ces données seront conservées dans Supabase avec un journal d'audit.</p></div>
+</section>
+
+<section id="subscription" class="page">
+<div class="grid sections">
+<div class="subscription"><div class="muted" style="font-size:11px">ABONNEMENT MARCHAND</div><div style="font-size:28px;font-weight:900;margin:8px 0" id="subPrice">2 000 F / mois</div><div class="muted" id="subState">Actif</div><div class="muted" id="subExpires" style="margin-top:5px">Expire le —</div><button class="btn" style="margin-top:16px;background:#fff;color:#155eef" onclick="startSubscription('merchant')">Se réabonner via FedaPay</button></div>
+<div class="card"><h2>Tarification</h2><div class="plan active"><h3>Marchand</h3><div class="plan-price">1 000 F</div><small>Premier abonnement d'un nouveau compte</small><div style="margin-top:9px;font-weight:700">Puis 2 000 F / mois</div></div><div class="plan" style="margin-top:12px"><h3>Agent</h3><div class="plan-price">500 F</div><small>Par agent et par mois, séparément du marchand</small></div></div>
+</div>
+<div class="card" style="margin-top:15px"><h2>Historique des paiements</h2><div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Compte</th><th>Montant</th><th>Statut</th><th>Référence</th></tr></thead><tbody id="paymentsTable"></tbody></table></div></div>
+</section>
+
+<section id="settings" class="page">
+<div class="card"><h2>Profil</h2><form id="settingsForm" class="form-grid" style="margin-top:15px"><div class="field"><label>Nom de la boutique</label><input id="shopName"></div><div class="field"><label>Marchand</label><input id="merchantName"></div><div class="field"><label>Téléphone du compte</label><input id="merchantPhone"></div><div class="field"><label>Email</label><input id="merchantEmail"></div><div id="agentMerchantContact" class="field full hidden"><label>Numéro du marchand</label><div class="phone-actions"><input id="merchantContactPhone" type="tel" placeholder="Ex. +229XXXXXXXX" autocomplete="tel"><button type="button" class="icon-btn" title="WhatsApp du marchand" class="icon-btn merchant-agent-only" onclick="openMerchantWhatsApp()">◉</button><button type="button" class="icon-btn" title="Appeler le marchand" class="icon-btn merchant-agent-only" onclick="callMerchant()">☎</button></div><small style="color:var(--muted)">Ce numéro est utilisé par l’agent pour contacter directement le marchand.</small></div><div class="field full"><label>Adresse / observation</label><textarea id="shopNote" rows="3"></textarea></div><div class="full"><button class="btn">Enregistrer</button></div></form><hr style="border:0;border-top:1px solid var(--line);margin:22px 0"><div class="notice warning"><b>Production :</b> Supabase sera la source de vérité pour les comptes, abonnements, opérations et droits d'accès. FedaPay sera appelé via une fonction sécurisée, jamais avec une clé secrète dans le HTML.</div></div>
+</section>
+</main>
+</div>
+
+<div id="modal" class="modal"><div class="modal-box"><div class="modal-head"><h3 id="modalTitle"></h3><button class="close" onclick="closeModal()">×</button></div><div id="modalBody"></div></div></div>
+
+<script>
+/*
+ MONEYPRO — ARCHITECTURE PRÊTE POUR SUPABASE + FEDAPAY
+
+ Supabase n'est volontairement pas encore configuré.
+ Quand le projet sera créé :
+ - Auth Supabase remplacera l'authentification locale.
+ - Les données seront stockées dans Supabase.
+ - RLS séparera les marchands et leurs agents.
+ - Une Edge Function gérera la création/validation FedaPay.
+ - Le statut d'abonnement sera calculé côté serveur.
+*/
+
+const STORAGE="moneypro_complete_v2";
+
+const initialData={
+ profile:{
+  role:"merchant",shopName:"Ma boutique Mobile Money",name:"Marchand Démo",
+  phone:"",email:"demo@moneypro.local"
+ },
+ wallets:[
+  {id:"mtn",name:"MTN",balance:0},
+  {id:"moov",name:"Moov",balance:0},
+  {id:"celtiis",name:"Celtiis",balance:0},
+  {id:"cash",name:"Espèces",balance:0}
+ ],
+ operations:[],
+ expenses:[],
+ products:[],
+ agents:[],
+ payments:[],
+ subscription:{
+  status:"active",
+  everSubscribed:false,
+  price:1000,
+  startedAt:null,
+  expiresAt:null
+ }
+};
+
+let data=load();
+// Migration des données v5 vers la séparation marchand/agents.
+if(!data.merchantProfile)data.merchantProfile=clone(data.profile||initialData.profile);
+if(!data.merchantWallets)data.merchantWallets=clone(data.wallets||initialData.wallets);
+if(!Array.isArray(data.agents))data.agents=[];
+data.agents.forEach(a=>{a.wallets=a.wallets||clone(initialData.wallets);a.profile=a.profile||{role:"agent",name:a.name,shopName:data.merchantProfile.shopName,phone:a.phone,email:a.email,merchantContactPhone:data.merchantProfile.phone||"",dayStarted:false,openingDate:null};a.status=a.status||"active";a.subscription=a.subscription||{status:"inactive",expiresAt:null,everSubscribed:false,price:500};});
+function persistCurrentAccount(){
+ const role=localStorage.getItem("moneypro_role")||"merchant",aid=localStorage.getItem("moneypro_agent_id")||"";
+ if(role==="agent"&&aid){const a=data.agents.find(x=>x.id===aid);if(a){a.profile=clone(data.profile);a.wallets=clone(data.wallets);}}
+ else {data.merchantProfile=clone(data.profile);data.merchantWallets=clone(data.wallets);}
+}
+const _save=save;
+save=function(){persistCurrentAccount();_save();};
+function restoreSessionAccount(){
+ const role=localStorage.getItem("moneypro_role")||"merchant";
+ if(role==="agent"){const a=data.agents.find(x=>x.id===localStorage.getItem("moneypro_agent_id"));if(a){data.profile=clone(a.profile);data.wallets=clone(a.wallets||initialData.wallets);return;}}
+ data.profile=clone(data.merchantProfile||initialData.profile);data.wallets=clone(data.merchantWallets||initialData.wallets);
+}
+restoreSessionAccount();
+
+function clone(o){return JSON.parse(JSON.stringify(o))}
+function load(){try{return JSON.parse(localStorage.getItem(STORAGE))||clone(initialData)}catch(e){return clone(initialData)}}
+function save(){localStorage.setItem(STORAGE,JSON.stringify(data));renderAll()}
+function money(n){return new Intl.NumberFormat("fr-FR").format(Math.round(Number(n)||0))+" F"}
+function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
+function isoNow(){return new Date().toISOString()}
+function fmt(d){return new Date(d).toLocaleString("fr-FR",{dateStyle:"short",timeStyle:"short"})}
+function today(d){return new Date(d).toDateString()===new Date().toDateString()}
+function month(d){let a=new Date(d),b=new Date();return a.getMonth()===b.getMonth()&&a.getFullYear()===b.getFullYear()}
+function findWallet(n){return data.wallets.find(w=>w.name===n)}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,8)}
+function msg(t,ok=false){let e=document.getElementById("authMsg");e.textContent=t;e.className="msg "+(ok?"success":"error")}
+
+/* AUTH UI */
+function authView(v){
+ document.getElementById("signupForm").classList.toggle("hidden",v!=="signup");
+ document.getElementById("loginForm").classList.toggle("hidden",v!=="login");
+ document.getElementById("forgotForm").classList.toggle("hidden",v!=="forgot");
+ document.getElementById("tabSignup").classList.toggle("active",v==="signup");
+ document.getElementById("tabLogin").classList.toggle("active",v==="login");
+ document.getElementById("authTitle").textContent=v==="signup"?"Créer votre compte":v==="login"?"Connexion":"Mot de passe oublié";
+ document.getElementById("authSubtitle").textContent=v==="forgot"?"Recevez un lien sécurisé de réinitialisation.":"Gérez vos opérations Mobile Money, votre caisse et votre stock.";
+ msg("");
+}
+document.getElementById("signupForm").onsubmit=e=>{
+ e.preventDefault();
+ let p1=suPass.value,p2=suPass2.value;
+ if(p1!==p2)return msg("Les deux mots de passe sont différents.");
+ data.profile={role:"merchant",shopName:suShop.value.trim(),name:suName.value.trim(),phone:suPhone.value.trim(),email:suEmail.value.trim(),merchantContactPhone:"",dayStarted:false,openingDate:null};
+ data.subscription={status:"inactive",everSubscribed:false,price:1000,startedAt:null,expiresAt:null};
+ data.merchantProfile=clone(data.profile);data.merchantWallets=clone(data.wallets);
+ localStorage.setItem(STORAGE,JSON.stringify(data));
+ localStorage.setItem("moneypro_role","merchant");localStorage.removeItem("moneypro_agent_id");localStorage.setItem("moneypro_session","1");
+ msg("Compte créé. En production, Supabase créera le compte et vous redirigera vers la vérification email.",true);
+ setTimeout(showApp,500);
+};
+document.getElementById("loginForm").onsubmit=e=>{
+ e.preventDefault();
+ const email=String(liEmail.value||"").trim().toLowerCase(), pass=String(liPass.value||"");
+ if(!localStorage.getItem(STORAGE))return msg("Aucun compte local. Utilisez l'inscription.");
+ if(email===String(data.profile.email||"").trim().toLowerCase()){
+   switchToMerchant(); localStorage.setItem("moneypro_session","1"); showApp(); return;
+ }
+ const a=data.agents.find(x=>String(x.email||"").trim().toLowerCase()===email);
+ if(a){
+   if(pass!==String(a.password||""))return msg("Identifiants agent incorrects.");
+   switchToAgent(a.id); localStorage.setItem("moneypro_session","1"); showApp(); return;
+ }
+ msg("Compte introuvable ou identifiants incorrects.");
+};
+document.getElementById("forgotForm").onsubmit=e=>{e.preventDefault();msg("En mode local, aucune adresse n'est réellement envoyée. Avec Supabase, un lien sécurisé sera envoyé automatiquement.",true)};
+function demoLogin(){switchToMerchant();localStorage.setItem("moneypro_session","1");showApp()}
+function showApp(){restoreSessionAccount();document.getElementById("authScreen").classList.add("hidden");document.getElementById("app").classList.remove("hidden");loadSettings();renderAll();configureAgentView();populateMerchantAgentSelector()}
+function logout(){persistCurrentAccount();switchToMerchant();localStorage.removeItem("moneypro_session");document.getElementById("app").classList.add("hidden");document.getElementById("authScreen").classList.remove("hidden");authView("login")}
+function resetAll(){if(confirm("Effacer toutes les données locales ?")){localStorage.removeItem(STORAGE);location.reload()}}
+
+/* NAV */
+const titles={dashboard:"Tableau de bord",operations:"Opérations",wallets:"Portefeuilles",expenses:"Dépenses",inventory:"Inventaire",agents:"Agents",reports:"Rapports",subscription:"Abonnement",settings:"Paramètres"};
+function showPage(id){document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));document.getElementById(id).classList.add("active");document.querySelectorAll(".nav button").forEach(x=>x.classList.toggle("active",x.dataset.page===id));document.getElementById("pageTitle").textContent=titles[id];document.getElementById("sidebar").classList.remove("open")}
+document.querySelectorAll(".nav button").forEach(b=>b.onclick=()=>showPage(b.dataset.page));
+function toggleSidebar(){document.getElementById("sidebar").classList.toggle("open")}
+function openModal(t,b){modalTitle.textContent=t;modalBody.innerHTML=b;modal.classList.add("open")}
+function closeModal(){modal.classList.remove("open")}
+
+/* OUVERTURE DE JOURNÉE */
+function openDayStart(){
+ openModal("Ouverture de journée",`<div class="notice">Avant sa première opération, l’agent doit enregistrer les soldes disponibles au début de sa journée.</div>
+ <form id="dayStartForm" class="form-grid" style="margin-top:13px">
+ <div class="field"><label>Solde MTN</label><input name="mtn" type="number" min="0" value="0" required></div>
+ <div class="field"><label>Solde Moov</label><input name="moov" type="number" min="0" value="0" required></div>
+ <div class="field"><label>Solde Celtiis</label><input name="celtiis" type="number" min="0" value="0" required></div>
+ <div class="field"><label>Espèces en caisse</label><input name="cash" type="number" min="0" value="0" required></div>
+ <div class="field full"><div class="actions"><button type="button" class="btn gray" onclick="closeModal()">Annuler</button><button class="btn">Commencer la journée</button></div></div></form>`);
+ document.getElementById("dayStartForm").onsubmit=e=>{e.preventDefault();let f=new FormData(e.target);[["MTN","mtn"],["Moov","moov"],["Celtiis","celtiis"],["Espèces","cash"]].forEach(([name,key])=>{let w=findWallet(name);if(w)w.balance=+f.get(key)||0});data.profile.dayStarted=true;data.profile.openingDate=isoNow();data.profile.openingBalances={MTN:+f.get("mtn")||0,Moov:+f.get("moov")||0,Celtiis:+f.get("celtiis")||0,Espèces:+f.get("cash")||0};save();closeModal();alert("Journée ouverte. Vous pouvez maintenant enregistrer les opérations.")};
+}
+function ensureDayStart(){
+ const notice=document.getElementById("dayStartNotice"),btn=document.getElementById("newOperationBtn");
+ const locked=data.profile.role==="agent"&&!data.profile.dayStarted;
+ if(notice)notice.innerHTML=locked?`<div class="day-lock"><b>Journée non ouverte.</b> Saisissez les soldes de départ avant de commencer les opérations. <button class="btn small" style="margin-left:8px" onclick="openDayStart()">Saisir les soldes</button></div>`:"";
+ if(btn)btn.disabled=locked;
+}
+
+/* OPÉRATIONS */
+function getCurrentAgent(){
+ const id=localStorage.getItem("moneypro_agent_id")||"";
+ return data.agents.find(a=>a.id===id)||null;
+}
+function getOperationContext(){
+ const role=mpRole();
+ if(role==="agent"){
+   const a=getCurrentAgent();
+   return a?{id:a.id,name:a.name,profile:a.profile||{},wallets:a.wallets||[],agent:a,createdBy:a.id}:null;
+ }
+ const selected=document.getElementById("opTargetAgent");
+ if(selected&&selected.value){
+   const a=data.agents.find(x=>x.id===selected.value);
+   return a?{id:a.id,name:a.name,profile:a.profile||{},wallets:a.wallets||[],agent:a,createdBy:"merchant"}:null;
+ }
+ return {id:null,name:data.profile.name,profile:data.profile,wallets:data.wallets,agent:null,createdBy:"merchant"};
+}
+function findWalletIn(wallets,name){return (wallets||[]).find(w=>w.name===name)}
+function openOperation(){
+ const role=mpRole();
+ if(role==="agent" && !agentSubscriptionActive()){alert("Votre abonnement agent n'est pas actif. Vous pouvez consulter votre historique, mais pas effectuer d'opérations.");return;}
+ if(role==="agent" && !getDay()?.open){openDayStart();return;}
+ const options=role==="merchant"?data.agents.map(a=>`<option value="${esc(a.id)}">${esc(a.name)}</option>`).join(""):"";
+ openModal("Nouvelle opération",`
+ <div class="notice">La commission est saisie manuellement. Aucun calcul automatique de commission.</div>
+ <form id="operationForm" class="form-grid" style="margin-top:13px">
+ <div class="field full" id="opTargetAgentWrap" style="display:${role==="merchant"?"block":"none"}"><label>Compte concerné</label><select id="opTargetAgent" name="targetAgent"><option value="">Compte marchand</option>${options}</select><small style="color:var(--muted)">Le marchand peut enregistrer l’opération sur son propre compte ou sur celui d’un agent.</small></div>
+ <div class="field"><label>Type d'opération</label><select name="type" required><option>Dépôt</option><option>Retrait</option><option>Vente de crédit</option><option>Vente de forfait</option></select></div>
+ <div class="field"><label>Compte opérateur</label><select name="operator" required><option>MTN</option><option>Moov</option><option>Celtiis</option></select></div>
+ <div class="field"><label>Montant</label><input name="amount" type="number" min="1" required></div>
+ <div class="field"><label>ID transaction</label><input name="transactionId" type="text" required placeholder="ID fourni par l’opérateur" autocomplete="off"></div>
+ <div class="field"><label>Commission (saisie manuelle)</label><input name="fee" type="number" min="0" value="0"></div>
+ <div class="field"><label>Client / numéro</label><input name="client"></div>
+ <div class="field"><label>Date</label><input name="date" type="datetime-local" value="${new Date().toISOString().slice(0,16)}"></div>
+ <div class="field full"><label>Observation</label><textarea name="note" rows="3"></textarea></div>
+ <div class="field full"><div class="actions"><button type="button" class="btn gray" onclick="closeModal()">Annuler</button><button class="btn">Enregistrer</button></div></div>
+ </form>`);
+ const form=document.getElementById("operationForm");
+ form.onsubmit=e=>{
+  e.preventDefault();
+  const f=new FormData(e.target),amount=+f.get("amount"),fee=+f.get("fee")||0,type=f.get("type"),op=f.get("operator"),transactionId=String(f.get("transactionId")||"").trim();
+  if(!transactionId)return alert("L'ID transaction est obligatoire.");
+  if(data.operations.some(x=>String(x.transactionId||"").toLowerCase()===transactionId.toLowerCase()))return alert("Cet ID transaction existe déjà.");
+  const ctx=getOperationContext();
+  if(!ctx)return alert("Compte agent introuvable.");
+  const wallets=ctx.wallets,operator=findWalletIn(wallets,op),cash=findWalletIn(wallets,"Espèces");
+  if(!operator||!cash)return alert("Portefeuille du compte concerné introuvable.");
+  if(ctx.id && !ctx.agent) return alert("Compte agent introuvable.");
+  if((type==="Dépôt"||type==="Vente de crédit"||type==="Vente de forfait") && operator.balance<amount)return alert("Solde opérateur insuffisant sur le compte concerné.");
+  if(type==="Retrait" && cash.balance<amount)return alert("Espèces insuffisantes sur le compte concerné.");
+  if(type==="Dépôt"||type==="Vente de crédit"||type==="Vente de forfait"){operator.balance-=amount;cash.balance+=amount}
+  if(type==="Retrait"){operator.balance+=amount;cash.balance-=amount}
+  const targetAgentId=ctx.agent?ctx.agent.id:null;
+  data.operations.unshift({id:uid(),transactionId,type,operator:op,amount,fee,client:f.get("client"),note:f.get("note"),agent:ctx.name,agentId:targetAgentId,accountType:ctx.agent?"agent":"merchant",createdBy:ctx.createdBy,createdAt:isoNow(),date:new Date(f.get("date")).toISOString()});
+  if(ctx.agent){ctx.agent.wallets=wallets;ctx.agent.profile=ctx.agent.profile||{};ctx.agent.profile.dayStarted=ctx.agent.profile.dayStarted!==false;}
+  save();closeModal();
+ };
+}
+
+/* SUPPRESSION : en production, les écritures seront immuables et corrigées par contre-mouvement. */
+function reverseOperation(o){
+ let wallets;
+ if(o.agentId){const a=data.agents.find(x=>x.id===o.agentId);wallets=a?.wallets||[]}
+ else wallets=data.wallets;
+ let operator=findWalletIn(wallets,o.operator),cash=findWalletIn(wallets,"Espèces");
+ if(!operator||!cash)return;
+ if(o.type==="Dépôt"||o.type==="Vente de crédit"||o.type==="Vente de forfait"){operator.balance+=o.amount;cash.balance-=o.amount}
+ else {operator.balance-=o.amount;cash.balance+=o.amount}
+}
+function deleteOperation(id){
+ let o=data.operations.find(x=>x.id===id);if(!o)return;
+ if(confirm("En production cette opération sera corrigée par un contre-mouvement. Supprimer en mode local ?")){reverseOperation(o);data.operations=data.operations.filter(x=>x.id!==id);save()}
+}
+function renderOperations(){
+ ensureDayStart();
+ let q=(document.getElementById("opSearch")?.value||"").toLowerCase(),ft=document.getElementById("opFilter")?.value||"",fn=document.getElementById("netFilter")?.value||"";
+ const role=mpRole(),aid=localStorage.getItem("moneypro_agent_id")||"";
+ let rows=data.operations.filter(o=>role!=="agent"||o.agentId===aid).filter(o=>(!ft||o.type===ft)&&(!fn||o.operator===fn)&&(!q||JSON.stringify(o).toLowerCase().includes(q)));
+ opsTable.innerHTML=rows.length?rows.map(o=>`<tr><td>${fmt(o.date)}</td><td><b>${esc(o.transactionId||"—")}</b></td><td><span class="badge">${esc(o.type)}</span></td><td>${esc(o.operator)}</td><td>${esc(o.client||"—")}</td><td>${money(o.amount)}</td><td class="positive">${money(o.fee)}</td><td>${esc(o.agent)}</td><td>${esc(o.note||"—")}</td><td><button class="btn danger small" onclick="deleteOperation('${o.id}')">Supprimer</button></td></tr>`).join(""):`<tr><td colspan="10" class="empty">Aucune opération.</td></tr>`;
+}
+
+/* WALLETS */
+function renderWallets(){
+ walletsList.innerHTML=data.wallets.map(w=>`<div class="wallet"><strong>${esc(w.name)}</strong><div class="amount">${money(w.balance)}</div><div class="sub">Solde actuel</div></div>`).join("");
+ dashWallets.innerHTML=data.wallets.map(w=>`<div class="wallet"><strong>${esc(w.name)}</strong><div class="amount">${money(w.balance)}</div></div>`).join("");
+}
+
+/* EXPENSES */
+function openExpense(){
+ openModal("Nouvelle dépense",`<form id="expenseForm"><div class="field"><label>Catégorie</label><select name="category"><option>Loyer</option><option>Électricité</option><option>Internet</option><option>Transport</option><option>Approvisionnement</option><option>Salaire</option><option>Autre</option></select></div><div class="field"><label>Montant</label><input name="amount" type="number" min="1" required></div><div class="field"><label>Observation</label><textarea name="note"></textarea></div><div class="actions"><button type="button" class="btn gray" onclick="closeModal()">Annuler</button><button class="btn">Enregistrer</button></div></form>`);
+ document.getElementById("expenseForm").onsubmit=e=>{e.preventDefault();let f=new FormData(e.target);data.expenses.unshift({id:uid(),category:f.get("category"),amount:+f.get("amount"),note:f.get("note"),date:isoNow(),agent:data.profile.name});save();closeModal()}
+}
+function renderExpenses(){
+ let a=data.expenses.filter(x=>today(x.date)).reduce((s,x)=>s+x.amount,0),b=data.expenses.filter(x=>month(x.date)).reduce((s,x)=>s+x.amount,0);
+ expToday.textContent=money(a);expMonth.textContent=money(b);expCount.textContent=data.expenses.length;
+ expensesTable.innerHTML=data.expenses.length?data.expenses.map(x=>`<tr><td>${fmt(x.date)}</td><td>${esc(x.category)}</td><td class="negative">${money(x.amount)}</td><td>${esc(x.note||"—")}</td><td><button class="btn danger small" onclick="deleteExpense('${x.id}')">Supprimer</button></td></tr>`).join(""):`<tr><td colspan="5" class="empty">Aucune dépense.</td></tr>`;
+}
+function deleteExpense(id){if(confirm("Supprimer cette dépense ?")){data.expenses=data.expenses.filter(x=>x.id!==id);save()}}
+
+/* INVENTORY */
+function openProduct(){
+ openModal("Nouveau produit",`<form id="productForm" class="form-grid"><div class="field"><label>Produit</label><input name="name" required></div><div class="field"><label>Quantité</label><input name="qty" type="number" min="0" value="0"></div><div class="field"><label>Seuil</label><input name="threshold" type="number" min="0" value="5"></div><div class="field"><label>Prix achat</label><input name="buy" type="number" min="0"></div><div class="field"><label>Prix vente</label><input name="sell" type="number" min="0"></div><div class="full actions"><button type="button" class="btn gray" onclick="closeModal()">Annuler</button><button class="btn">Enregistrer</button></div></form>`);
+ document.getElementById("productForm").onsubmit=e=>{e.preventDefault();let f=new FormData(e.target);data.products.push({id:uid(),name:f.get("name"),qty:+f.get("qty")||0,threshold:+f.get("threshold")||0,buy:+f.get("buy")||0,sell:+f.get("sell")||0});save();closeModal()}
+}
+function renderInventory(){
+ let q=(document.getElementById("prodSearch")?.value||"").toLowerCase(),rows=data.products.filter(p=>p.name.toLowerCase().includes(q));
+ inventoryTable.innerHTML=rows.length?rows.map(p=>`<tr><td><b>${esc(p.name)}</b></td><td>${p.qty} ${p.qty<=p.threshold?'<span class="badge red">Bas</span>':""}</td><td>${p.threshold}</td><td>${money(p.buy)}</td><td>${money(p.sell)}</td><td>${money(p.qty*p.buy)}</td><td><button class="btn danger small" onclick="deleteProduct('${p.id}')">Supprimer</button></td></tr>`).join(""):`<tr><td colspan="7" class="empty">Aucun produit.</td></tr>`;
+}
+function deleteProduct(id){if(confirm("Supprimer ?")){data.products=data.products.filter(x=>x.id!==id);save()}}
+
+/* AGENTS */
+function generateTempPassword(){return Math.random().toString(36).slice(2,6).toUpperCase()+Math.floor(1000+Math.random()*9000)}
+function newAgentWallets(){return [{id:"mtn",name:"MTN",balance:0},{id:"moov",name:"Moov",balance:0},{id:"celtiis",name:"Celtiis",balance:0},{id:"cash",name:"Espèces",balance:0}]}
+function openAgent(){
+ openModal("Créer un agent",`<form id="agentForm" class="form-grid"><div class="notice full">L’agent aura son propre compte, ses propres soldes et son propre abonnement de <b>500 F CFA/mois</b>. Son abonnement ne modifie jamais celui du marchand.</div><div class="field"><label>Nom complet</label><input name="name" required></div><div class="field"><label>Téléphone</label><input name="phone" required></div><div class="field"><label>Email de connexion</label><input name="email" type="email" required></div><div class="full"><small style="color:var(--muted)">Un mot de passe temporaire sera généré et affiché une seule fois après création.</small></div><div class="actions full"><button type="button" class="btn gray" onclick="closeModal()">Annuler</button><button class="btn">Créer l’agent</button></div></form>`);
+ document.getElementById("agentForm").onsubmit=e=>{
+  e.preventDefault();let f=new FormData(e.target),email=String(f.get("email")||"").trim().toLowerCase();
+  if(data.agents.some(a=>String(a.email||"").toLowerCase()===email)||String(data.profile.email||"").toLowerCase()===email)return alert("Cette adresse email est déjà utilisée.");
+  const temp=generateTempPassword(),id=uid(),agent={id,name:f.get("name").trim(),phone:f.get("phone").trim(),email,password:temp,status:"active",merchantId:"local-merchant",merchantPhone:data.profile.phone||data.profile.merchantContactPhone||"",subscription:{status:"inactive",expiresAt:null,everSubscribed:false,price:500},profile:{role:"agent",name:f.get("name").trim(),shopName:data.profile.shopName,phone:f.get("phone").trim(),email,merchantContactPhone:data.profile.phone||data.profile.merchantContactPhone||"",dayStarted:false,openingDate:null},wallets:newAgentWallets(),createdAt:isoNow()};
+  data.agents.push(agent);save();closeModal();openModal("Agent créé",`<div class="notice"><b>${esc(agent.name)}</b> a été créé.</div><div class="stat-row"><span>Email de connexion</span><b>${esc(agent.email)}</b></div><div class="stat-row"><span>Mot de passe temporaire</span><b>${esc(temp)}</b></div><div class="notice warning" style="margin-top:12px">Transmettez ces identifiants à l’agent. En production, Supabase créera le compte Auth et imposera un changement de mot de passe.</div><div class="actions"><button class="btn" onclick="closeModal()">Fermer</button></div>`);
+ };
+}
+function renderAgents(){
+ agentsTable.innerHTML=data.agents.length?data.agents.map(a=>`<tr><td><b>${esc(a.name)}</b><br><small>${esc(a.email)}</small></td><td>${esc(a.phone)}</td><td>${a.status!=="inactive"?'<span class="badge green">Actif</span>':'<span class="badge red">Désactivé</span>'}</td><td>${a.subscription.status==="active"&&(!a.subscription.expiresAt||new Date(a.subscription.expiresAt)>new Date())?'<span class="badge green">Actif</span>':'<span class="badge red">Inactif</span>'}</td><td><button class="btn secondary small" onclick="startSubscription('agent','${a.id}')">Abonnement</button> <button class="btn small" onclick="switchToAgent('${a.id}')">Ouvrir</button> <button class="btn danger small" onclick="deactivateAgent('${a.id}')">Désactiver</button></td></tr>`).join(""):`<tr><td colspan="5" class="empty">Aucun agent.</td></tr>`;
+}
+function deactivateAgent(id){const a=data.agents.find(x=>x.id===id);if(!a)return;if(confirm("Désactiver cet agent ? Son historique sera conservé.")){a.status="inactive";save()}}
+function switchToAgent(id){
+ const a=data.agents.find(x=>x.id===id);if(!a)return;
+ persistCurrentAccount();
+ localStorage.setItem("moneypro_role","agent");localStorage.setItem("moneypro_agent_id",a.id);localStorage.setItem("moneypro_agent_subscription",JSON.stringify({active:a.subscription.status==="active",expiresAt:a.subscription.expiresAt}));
+ data.profile=clone(a.profile);data.wallets=clone(a.wallets||newAgentWallets());
+ showApp();showPage("dashboard");
+}
+function switchToMerchant(){
+ persistCurrentAccount();
+ const mp=data.merchantProfile||initialData.profile,mw=data.merchantWallets||initialData.wallets;
+ data.profile=clone(mp);data.wallets=clone(mw);
+ localStorage.setItem("moneypro_role","merchant");localStorage.removeItem("moneypro_agent_id");localStorage.removeItem("moneypro_agent_subscription");
+}
+function persistCurrentAccount(){
+ const role=mpRole(),aid=localStorage.getItem("moneypro_agent_id")||"";
+ if(role==="agent"&&aid){const a=data.agents.find(x=>x.id===aid);if(a){a.profile=clone(data.profile);a.wallets=clone(data.wallets);a.profile.dayStarted=!!data.profile.dayStarted;}}
+ else {data.merchantProfile=clone(data.profile);data.merchantWallets=clone(data.wallets)}
+}
+
+/* SUBSCRIPTIONS — LOCAL SIMULATION, SERA REMPLACÉE PAR SUPABASE + FEDAPAY */
+function startSubscription(kind,agentId=null){
+ let isAgent=kind==="agent",agent=isAgent?data.agents.find(a=>a.id===agentId):null;
+ if(isAgent&&!agent)return;
+ let first=isAgent?!agent.subscription.everSubscribed:!data.subscription.everSubscribed;
+ let price=isAgent?500:(first?1000:2000);
+ openModal("Réabonnement via FedaPay",`<div class="plan active"><h3>${isAgent?"Abonnement agent":"Abonnement marchand"}</h3><div class="plan-price">${money(price)} / mois</div><small>${isAgent?"Agent : "+esc(agent.name):(first?"Premier abonnement":"Renouvellement")}</small></div><div class="notice" style="margin-top:13px">FedaPay sera intégré ici. Le paiement sera confirmé côté serveur avant activation de l'abonnement.</div><div class="actions"><button class="btn gray" onclick="closeModal()">Annuler</button><button class="btn" onclick="simulatePayment('${kind}','${agentId||""}',${price})">Simuler le paiement en démo</button></div>`);
+}
+function simulatePayment(kind,agentId,price){
+ let start=new Date(),end=new Date(start);end.setMonth(end.getMonth()+1);
+ if(kind==="merchant"){data.subscription={status:"active",everSubscribed:true,price,startedAt:start.toISOString(),expiresAt:end.toISOString()};data.payments.unshift({id:uid(),date:isoNow(),account:"Marchand",amount:price,status:"paid",reference:"DEMO-"+uid()})}
+ else {let a=data.agents.find(x=>x.id===agentId);a.subscription={status:"active",everSubscribed:true,price:500,expiresAt:end.toISOString()};data.payments.unshift({id:uid(),date:isoNow(),account:"Agent — "+a.name,agentId:a.id,amount:500,status:"paid",reference:"DEMO-"+uid()})}
+ save();closeModal();alert("Paiement de démonstration enregistré. En production, cette étape sera remplacée par la confirmation FedaPay.");
+}
+
+/* REPORTS */
+function renderReports(){
+ const visibleOps=visibleOperations();
+ const vol=visibleOps.reduce((s,x)=>s+x.amount,0);
+ const fees=visibleOps.reduce((s,x)=>s+(Number(x.fee)||0),0);
+ const exp=data.expenses.reduce((s,x)=>s+(Number(x.amount)||0),0);
+ const wallets=mpRole()==="agent"?(getCurrentAgent()?.wallets||data.wallets):data.wallets;
+ const globalBalance=(wallets||[]).reduce((s,w)=>s+(Number(w.balance)||0),0);
+ const metric=(label,value,cls="")=>`<div class="report-stat-card"><div class="metric">${label}</div><div class="value ${cls}">${value}</div></div>`;
+ reportSummary.innerHTML=[
+   metric("Volume des opérations",money(vol)),
+   metric("Commissions saisies",money(fees),"positive"),
+   metric("Dépenses",money(exp),"negative"),
+   metric("Solde global",money(globalBalance))
+ ].join("");
+ const typeCounts={"Dépôt":0,"Retrait":0,"Vente de crédit":0,"Vente de forfait":0};
+ visibleOps.forEach(x=>{if(Object.prototype.hasOwnProperty.call(typeCounts,x.type))typeCounts[x.type]++;});
+ reportTypes.innerHTML=Object.entries(typeCounts).map(([k,v])=>metric(k,String(v))).join("");
+ const operators=["MTN","Moov","Celtiis"];
+ const byType=(type)=>operators.map(op=>({op,count:visibleOps.filter(x=>x.type===type&&x.operator===op).length}));
+ const operatorGrid=(target,type)=>{const el=document.getElementById(target);if(!el)return;el.innerHTML=byType(type).map(x=>`<div class="report-op-item"><span>${x.op}</span><b>${x.count}</b></div>`).join("");};
+ operatorGrid("reportDeposits","Dépôt");
+ operatorGrid("reportWithdrawals","Retrait");
+ operatorGrid("reportCredits","Vente de crédit");
+ operatorGrid("reportBundles","Vente de forfait");
+}
+
+/* SETTINGS */
+function loadSettings(){shopName.value=data.profile.shopName;merchantName.value=data.profile.name;merchantPhone.value=data.profile.phone;merchantEmail.value=data.profile.email;shopNote.value=data.profile.note||"";merchantContactPhone.value=data.profile.merchantContactPhone||"";document.getElementById("agentMerchantContact").classList.toggle("hidden",data.profile.role!=="agent");sideName.textContent=data.profile.name;sideRole.textContent=data.profile.role==="merchant"?"Marchand":"Agent";ensureDayStart()}
+settingsForm.onsubmit=e=>{e.preventDefault();data.profile.shopName=shopName.value;data.profile.name=merchantName.value;data.profile.phone=merchantPhone.value;data.profile.email=merchantEmail.value;data.profile.merchantContactPhone=merchantContactPhone.value.trim();data.profile.note=shopNote.value;save();alert("Paramètres enregistrés.")}
+
+/* DASHBOARD + SUB */
+function visibleOperations(){
+ const role=mpRole(),aid=localStorage.getItem("moneypro_agent_id")||"";
+ return role==="agent"?data.operations.filter(o=>o.agentId===aid):data.operations;
+}
+function renderDashboard(){
+ let ops=visibleOperations().filter(x=>today(x.date)),vol=ops.reduce((s,x)=>s+x.amount,0),fees=ops.reduce((s,x)=>s+x.fee,0),total=data.wallets.reduce((s,w)=>s+w.balance,0);
+ totalBalance.textContent=money(total);cashBalance.textContent=money(findWallet("Espèces").balance);todayOps.textContent=ops.length;todayVolume.textContent=money(vol);todayFees.textContent=money(fees);
+ let recent=visibleOperations().slice(0,8); recentOps.innerHTML=recent.length?recent.map(o=>`<tr><td>${fmt(o.date)}</td><td>${esc(o.type)}</td><td>${esc(o.operator)}</td><td>${money(o.amount)}</td><td class="positive">${money(o.fee)}</td></tr>`).join(""):`<tr><td colspan="5" class="empty">Aucune opération.</td></tr>`;
+ let s=data.subscription,active=s.status==="active"&&(!s.expiresAt||new Date(s.expiresAt)>new Date());
+ dashSubStatus.textContent=active?"Actif":"Expiré / inactif";dashSubDate.textContent=s.expiresAt?"Expire le "+fmt(s.expiresAt):"Aucun abonnement actif";
+}
+function renderSubscription(){
+ const isAgent=mpRole()==="agent",a=getCurrentAgent(),s=isAgent?(a?.subscription||{status:"inactive",everSubscribed:false,expiresAt:null}):data.subscription,first=isAgent?false:!s.everSubscribed,price=isAgent?500:(first?1000:2000);
+ subPrice.textContent=money(price)+" / mois";subState.textContent=s.status==="active"&&(!s.expiresAt||new Date(s.expiresAt)>new Date())?"Actif":"Inactif";subExpires.textContent=s.expiresAt?"Expire le "+fmt(s.expiresAt):"Aucune date d'expiration";
+ paymentsTable.innerHTML=data.payments.filter(p=>!isAgent||p.agentId===a?.id).length?data.payments.filter(p=>!isAgent||p.agentId===a?.id).map(p=>`<tr><td>${fmt(p.date)}</td><td>${esc(p.account)}</td><td>${money(p.amount)}</td><td><span class="badge green">${esc(p.status)}</span></td><td>${esc(p.reference)}</td></tr>`).join(""):`<tr><td colspan="5" class="empty">Aucun paiement.</td></tr>`;
+}
+
+/* GLOBAL */
+function renderAll(){loadSettings();renderDashboard();renderOperations();renderWallets();renderExpenses();renderInventory();renderAgents();renderReports();renderSubscription()}
+if(localStorage.getItem("moneypro_session")==="1")showApp();
+else document.getElementById("authScreen").classList.remove("hidden");
+
+function getMerchantPhone(){ return String(data.profile.merchantContactPhone||"").trim(); }
+function saveMerchantPhone(){ const el=document.getElementById("merchantContactPhone"); if(!el) return; data.profile.merchantContactPhone=el.value.trim(); save(); }
+function normalizePhone(v){ return v.replace(/[^\\d+]/g,""); }
+function openMerchantWhatsApp(){ saveMerchantPhone(); const n=normalizePhone(getMerchantPhone()).replace(/^\\+/,""); if(!n){ alert("Enregistrez d'abord le numéro du marchand."); return; } window.open("https://wa.me/"+n,"_blank","noopener,noreferrer"); }
+function callMerchant(){ saveMerchantPhone(); const n=normalizePhone(getMerchantPhone()); if(!n){ alert("Enregistrez d'abord le numéro du marchand."); return; } window.location.href="tel:"+n; }
+(function(){ const el=document.getElementById("merchantContactPhone"); if(el) el.value=getMerchantPhone(); })();
+
+// Compatibilité : une journée est portée par le compte courant, pas par le marchand global.
+function accountDayOpen(){return !!data.profile.dayStarted}
+function openDayStart(){
+ openModal("Ouverture de journée",`<div class="notice">Avant sa première opération, l’agent doit enregistrer les soldes disponibles au début de sa journée. Le marchand peut également ouvrir sa propre journée.</div><form id="dayStartForm2" class="form-grid" style="margin-top:13px"><div class="field"><label>Solde MTN</label><input name="mtn" type="number" min="0" value="${findWallet("MTN")?.balance||0}" required></div><div class="field"><label>Solde Moov</label><input name="moov" type="number" min="0" value="${findWallet("Moov")?.balance||0}" required></div><div class="field"><label>Solde Celtiis</label><input name="celtiis" type="number" min="0" value="${findWallet("Celtiis")?.balance||0}" required></div><div class="field"><label>Espèces en caisse</label><input name="cash" type="number" min="0" value="${findWallet("Espèces")?.balance||0}" required></div><div class="field full"><div class="actions"><button type="button" class="btn gray" onclick="closeModal()">Annuler</button><button class="btn">Commencer la journée</button></div></div></form>`);
+ document.getElementById("dayStartForm2").onsubmit=e=>{e.preventDefault();const f=new FormData(e.target);[["MTN","mtn"],["Moov","moov"],["Celtiis","celtiis"],["Espèces","cash"]].forEach(([n,k])=>{const w=findWallet(n);if(w)w.balance=+f.get(k)||0});data.profile.dayStarted=true;data.profile.openingDate=isoNow();data.profile.openingBalances={MTN:+f.get("mtn")||0,Moov:+f.get("moov")||0,Celtiis:+f.get("celtiis")||0,Espèces:+f.get("cash")||0};save();closeModal();alert("Journée ouverte. Vous pouvez maintenant effectuer les opérations.");};
+}
+function getDay(){return data.profile.dayStarted?{open:true,openedAt:data.profile.openingDate,opening:data.profile.openingBalances}:null}
+function agentSubscriptionActive(){if(mpRole()!=="agent")return true;const a=getCurrentAgent();return !!(a&&a.status!=="inactive"&&a.subscription.status==="active"&&(!a.subscription.expiresAt||new Date(a.subscription.expiresAt)>new Date()))}
+function canAgentOperate(){return mpRole()!=="agent"||(agentSubscriptionActive()&&accountDayOpen())}
+function updateDayUI(){const el=document.getElementById("dayStatus");if(!el)return;const d=getDay();el.innerHTML=d&&d.open?"<strong>Journée ouverte</strong><br>Ouverte le "+new Date(d.openedAt).toLocaleString():"<strong>Journée fermée</strong><br>Ouvrez une journée pour commencer les opérations."}
+function closeDayEntry(){if(!data.profile.dayStarted){alert("Aucune journée ouverte.");return}data.profile.closingBalances=Object.fromEntries(data.wallets.map(w=>[w.name,w.balance]));data.profile.dayStarted=false;data.profile.closedAt=isoNow();save();updateDayUI();alert("Journée clôturée. L’historique reste consultable.")}
+function applyAgentOperationLock(){const allowed=canAgentOperate();document.querySelectorAll('[data-operation-action], #operations button[type="submit"], #newOperationBtn').forEach(b=>{if(mpRole()==="agent"){b.disabled=!allowed;b.title=!agentSubscriptionActive()?"Abonnement agent inactif":(!accountDayOpen()?"Ouvrez votre journée":"")}})}
+function configureAgentView(){const isAgent=mpRole()==="agent";const rb=document.getElementById("agentReturnBar");if(rb)rb.style.display=isAgent?"block":"none";document.querySelectorAll('button[data-page="agents"], #agents, #agentAccessRules').forEach(e=>e.style.display=isAgent?"none":"");document.querySelectorAll('[data-owner-only], .merchant-only').forEach(e=>e.style.display=isAgent?"none":"");updateDayUI();applyAgentOperationLock();showAgentOnlyProfileActions();}
+
+// --- Gestion explicite de la journée et des droits agent ---
+function moneyproCurrentRole(){
+  return localStorage.getItem("moneypro_role") || "merchant";
+}
+function moneyproAgentId(){
+  return localStorage.getItem("moneypro_agent_id") || "";
+}
+function dayKey(){
+  return "moneypro_day_"+(moneyproAgentId()||"merchant");
+}
+function getDay(){
+  try{return JSON.parse(localStorage.getItem(dayKey())||"null")}catch(e){return null}
+}
+function setDay(d){localStorage.setItem(dayKey(),JSON.stringify(d))}
+function openDayEntry(){
+  const d=getDay();
+  if(d && d.open) { alert("La journée est déjà ouverte."); return; }
+  const panel=document.getElementById("dayEntryPanel"); if(panel) panel.style.display="block";
+  const title=document.getElementById("dayEntryTitle"); if(title) title.textContent="Ouverture de journée";
+}
+function saveDayOpening(){
+  const vals={
+    MTN:Number(document.getElementById("openingMTN")?.value||0),
+    Moov:Number(document.getElementById("openingMoov")?.value||0),
+    Celtiis:Number(document.getElementById("openingCeltiis")?.value||0),
+    Espèces:Number(document.getElementById("openingCash")?.value||0)
+  };
+  if(Object.values(vals).some(v=>!Number.isFinite(v)||v<0)){alert("Les soldes doivent être valides.");return}
+  setDay({open:true,openedAt:new Date().toISOString(),opening:vals});
+  localStorage.setItem("moneypro_day_open","1");
+  updateDayUI();
+  const panel=document.getElementById("dayEntryPanel"); if(panel) panel.style.display="none";
+  alert("Journée ouverte. Vous pouvez maintenant effectuer vos opérations.");
+}
+function closeDayEntry(){
+  const d=getDay();
+  if(!d || !d.open){alert("Aucune journée ouverte.");return}
+  const wallets=(window.MoneyProState&&MoneyProState.wallets)||null;
+  d.closeRequestedAt=new Date().toISOString();
+  d.closing=wallets;
+  d.open=false;
+  d.closedAt=new Date().toISOString();
+  setDay(d);
+  localStorage.removeItem("moneypro_day_open");
+  updateDayUI();
+  alert("Journée clôturée. L'historique reste consultable.");
+}
+function updateDayUI(){
+  const el=document.getElementById("dayStatus"); if(!el)return;
+  const d=getDay();
+  el.innerHTML=d&&d.open
+    ? "<strong>Journée ouverte</strong><br>Ouverte le "+new Date(d.openedAt).toLocaleString()
+    : "<strong>Journée fermée</strong><br>Ouvrez une journée pour commencer les opérations.";
+}
+function agentSubscriptionActive(){
+  const role=moneyproCurrentRole();
+  if(role!=="agent") return true;
+  try{
+    const a=JSON.parse(localStorage.getItem("moneypro_agent_subscription")||"null");
+    return !!(a && a.active && (!a.expiresAt || new Date(a.expiresAt)>new Date()));
+  }catch(e){return false}
+}
+function canAgentOperate(){
+  if(moneyproCurrentRole()!=="agent") return true;
+  return agentSubscriptionActive() && !!getDay()?.open;
+}
+function applyAgentOperationLock(){
+  const allowed=canAgentOperate();
+  document.querySelectorAll('[data-operation-action], #operations button[type="submit"], #newOperationBtn').forEach(b=>{
+    if(moneyproCurrentRole()==="agent"){
+      b.disabled=!allowed;
+      b.title=!agentSubscriptionActive()?"Abonnement agent inactif":(!getDay()?.open?"Ouvrez votre journée":"");
+    }
+  });
+}
+function configureAgentView(){
+  if(moneyproCurrentRole()!=="agent") return;
+  document.querySelectorAll('[data-owner-only], .merchant-only').forEach(e=>e.style.display="none");
+  updateDayUI(); applyAgentOperationLock();
+}
+document.addEventListener("DOMContentLoaded",()=>{updateDayUI();configureAgentView();});
+window.addEventListener("storage",()=>{updateDayUI();applyAgentOperationLock()});
+
+document.addEventListener("submit",function(e){
+  const form=e.target;
+  if(form && moneyproCurrentRole()==="agent" && form.closest("#operations") && !canAgentOperate()){
+    e.preventDefault(); e.stopImmediatePropagation();
+    alert(!agentSubscriptionActive()?"Votre abonnement agent n'est pas actif. Vous pouvez consulter votre historique, mais pas effectuer d'opérations.":"Ouvrez votre journée avant d'effectuer une opération.");
+    return false;
+  }
+},true);
+
+function mpRole(){ return localStorage.getItem("moneypro_role") || "merchant"; }
+function showAgentOnlyProfileActions(){
+ const isAgent=mpRole()==="agent";
+ document.querySelectorAll(".merchant-agent-only").forEach(el=>el.style.display=isAgent?"inline-flex":"none");
+}
+function populateMerchantAgentSelector(){
+ const wrap=document.getElementById("opTargetAgentWrap"),select=document.getElementById("opTargetAgent");if(!wrap||!select)return;
+ const isMerchant=mpRole()==="merchant";wrap.style.display=isMerchant?"block":"none";if(!isMerchant)return;
+ select.innerHTML='<option value="">Compte marchand</option>'+data.agents.filter(a=>a.status!=="inactive").map(a=>`<option value="${esc(a.id)}">${esc(a.name)}</option>`).join("");
+}
+function selectedOperationAccount(){const el=document.getElementById("opTargetAgent");return mpRole()==="merchant"&&el&&el.value?el.value:null;}
+function prepareOperationAgentField(){populateMerchantAgentSelector();showAgentOnlyProfileActions();}
+document.addEventListener("DOMContentLoaded",prepareOperationAgentField);
+</script>
+</body>
+</html>
