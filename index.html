@@ -39,7 +39,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:
       <div class="field"><label>Nom du marchand / entreprise</label><input id="suShop" required placeholder="Ex. Boutique Pedro"></div>
       <div class="field"><label>Nom complet</label><input id="suName" required placeholder="Votre nom"></div>
       <div class="field"><label>Téléphone</label><input id="suPhone" required placeholder="+229..."></div>
-      <div class="field"><label>Email <span style="font-weight:400;color:var(--muted)">(facultatif si téléphone utilisé)</span></label><input id="suEmail" type="email" placeholder="email@exemple.com"></div>
+      <div class="field"><label>Email</label><input id="suEmail" type="email" placeholder="email@exemple.com" required></div>
       <div class="field"><label>Mot de passe</label><input id="suPass" type="password" minlength="6" required></div>
       <div class="field"><label>Confirmer le mot de passe</label><input id="suPass2" type="password" minlength="6" required></div>
       <button class="btn" style="width:100%">Créer mon compte</button>
@@ -774,10 +774,9 @@ if(mpSupabase){
     e.preventDefault();
     const password=String(suPass.value||""),password2=String(suPass2.value||""),email=String(suEmail.value||"").trim().toLowerCase(),phone=String(suPhone.value||"").trim();
     if(password!==password2)return msg("Les deux mots de passe sont différents.");
-    if(!email&&!phone)return msg("Indiquez au moins un email ou un numéro de téléphone.");
+    if(!email)return msg("L'adresse email est obligatoire : elle est utilisée pour la confirmation du compte.");
     try{
-      const credentials={password,options:{data:{name:suName.value.trim(),shop_name:suShop.value.trim(),phone},emailRedirectTo:"https://moneypro.phenixconnect.online/?confirmed=1"}};
-      if(email)credentials.email=email;else credentials.phone=phone;
+      const credentials={email,password,options:{data:{name:suName.value.trim(),shop_name:suShop.value.trim(),phone},emailRedirectTo:"https://moneypro.phenixconnect.online/?confirmed=1"}};
       const {data,error}=await mpSupabase.auth.signUp(credentials); if(error)throw error;
       if(!data.session){msg("Compte créé. Vérifiez votre email si la confirmation est activée dans Supabase.",true);return;}
       await mpLoadFromSupabase();showApp();
