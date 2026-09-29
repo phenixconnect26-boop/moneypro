@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b1020">
 <title>MoneyPro — Gestion Mobile Money</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{--bg:#f4f6fa;--card:#fff;--ink:#101828;--muted:#667085;--line:#e4e7ec;--blue:#155eef;--blue2:#0b4acb;--green:#12b76a;--red:#f04438;--orange:#f79009;--nav:#0b1020;--shadow:0 10px 30px #10182812}
 *{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink)}
@@ -38,14 +39,14 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:
       <div class="field"><label>Nom du marchand / entreprise</label><input id="suShop" required placeholder="Ex. Boutique Pedro"></div>
       <div class="field"><label>Nom complet</label><input id="suName" required placeholder="Votre nom"></div>
       <div class="field"><label>Téléphone</label><input id="suPhone" required placeholder="+229..."></div>
-      <div class="field"><label>Email</label><input id="suEmail" type="email" required placeholder="email@exemple.com"></div>
+      <div class="field"><label>Email <span style="font-weight:400;color:var(--red)">(obligatoire)</span></label><input id="suEmail" type="email" required placeholder="email@exemple.com"></div>
       <div class="field"><label>Mot de passe</label><input id="suPass" type="password" minlength="6" required></div>
       <div class="field"><label>Confirmer le mot de passe</label><input id="suPass2" type="password" minlength="6" required></div>
       <button class="btn" style="width:100%">Créer mon compte</button>
     </form>
 
     <form id="loginForm" class="hidden">
-      <div class="field"><label>Email du compte</label><input id="liEmail" type="email" required></div>
+      <div class="field"><label>Email ou téléphone</label><input id="liEmail" type="text" required></div>
       <div class="field"><label>Mot de passe</label><input id="liPass" type="password" required></div>
       <div class="auth-actions"><button type="button" class="link" onclick="authView('forgot')">Mot de passe oublié ?</button><button class="btn">Se connecter</button></div>
     </form>
@@ -55,6 +56,13 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:
       <div class="field" style="margin-top:13px"><label>Email</label><input id="forgotEmail" type="email" required></div>
       <button class="btn" style="width:100%">Envoyer le lien</button>
       <div style="text-align:center;margin-top:12px"><button type="button" class="link" onclick="authView('login')">← Retour à la connexion</button></div>
+    </form>
+
+    <form id="resetForm" class="hidden">
+      <div class="notice">Choisissez votre nouveau mot de passe.</div>
+      <div class="field" style="margin-top:13px"><label>Nouveau mot de passe</label><input id="resetPass" type="password" minlength="6" required></div>
+      <div class="field"><label>Confirmer le mot de passe</label><input id="resetPass2" type="password" minlength="6" required></div>
+      <button class="btn" style="width:100%">Enregistrer le nouveau mot de passe</button>
     </form>
     <div id="authMsg" class="msg"></div>
     <div class="footer-note">Mode de démonstration local disponible avant la création de Supabase.</div>
@@ -253,10 +261,11 @@ function authView(v){
  document.getElementById("signupForm").classList.toggle("hidden",v!=="signup");
  document.getElementById("loginForm").classList.toggle("hidden",v!=="login");
  document.getElementById("forgotForm").classList.toggle("hidden",v!=="forgot");
+ document.getElementById("resetForm")?.classList.toggle("hidden",v!=="reset");
  document.getElementById("tabSignup").classList.toggle("active",v==="signup");
  document.getElementById("tabLogin").classList.toggle("active",v==="login");
- document.getElementById("authTitle").textContent=v==="signup"?"Créer votre compte":v==="login"?"Connexion":"Mot de passe oublié";
- document.getElementById("authSubtitle").textContent=v==="forgot"?"Recevez un lien sécurisé de réinitialisation.":"Gérez vos opérations Mobile Money, votre caisse et votre stock.";
+ document.getElementById("authTitle").textContent=v==="signup"?"Créer votre compte":v==="login"?"Connexion":v==="reset"?"Nouveau mot de passe":"Mot de passe oublié";
+ document.getElementById("authSubtitle").textContent=v==="forgot"?"Recevez un lien sécurisé de réinitialisation.":v==="reset"?"Finalisez la réinitialisation de votre mot de passe.":"Gérez vos opérations Mobile Money, votre caisse et votre stock.";
  msg("");
 }
 document.getElementById("signupForm").onsubmit=e=>{
@@ -658,6 +667,465 @@ function populateMerchantAgentSelector(){
 function selectedOperationAccount(){const el=document.getElementById("opTargetAgent");return mpRole()==="merchant"&&el&&el.value?el.value:null;}
 function prepareOperationAgentField(){populateMerchantAgentSelector();showAgentOnlyProfileActions();}
 document.addEventListener("DOMContentLoaded",prepareOperationAgentField);
+
+/* ================================================================
+   MONEYPRO — COUCHE SUPABASE V7
+   Compatible avec le schéma MoneyPro actuel + migration SQL fournie.
+   ================================================================ */
+const MP_SUPABASE_URL = window.MONEYPRO_SUPABASE_URL || "https://dadqzjhruibpcgwrftvs.supabase.co";
+const MP_SUPABASE_ANON_KEY = window.MONEYPRO_SUPABASE_ANON_KEY || "sb_publishable_h_xd_C06XsatQ1DXwjzXIA_suOwP8qR";
+const MP_SUPABASE_CONFIGURED = !!(MP_SUPABASE_URL && MP_SUPABASE_ANON_KEY);
+let mpSupabase = null;
+let mpDbReady = false;
+
+if(window.supabase && MP_SUPABASE_CONFIGURED){
+  mpSupabase = window.supabase.createClient(MP_SUPABASE_URL, MP_SUPABASE_ANON_KEY, {
+    auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
+  });
+}
+function mpDbError(error){ console.error("MoneyPro/Supabase:",error); return error?.message || "Erreur Supabase."; }
+function mpDbMsg(message,ok=false){ msg(message,ok); }
+async function mpUser(){
+  if(!mpSupabase)return null;
+  const {data,error}=await mpSupabase.auth.getUser();
+  if(error)throw error;
+  return data.user;
+}
+async function mpUserId(){const u=await mpUser();return u?.id||null;}
+async function mpProfile(id){
+  const uid=id||await mpUserId();
+  const {data,error}=await mpSupabase.from("profiles").select("*").eq("id",uid).single();
+  if(error)throw error;
+  return data;
+}
+async function mpMerchantId(){
+  const p=await mpProfile();
+  return p.role==="merchant"?p.id:p.merchant_id;
+}
+function mpIsoDate(v){return v?new Date(v).toISOString():isoNow()}
+function mpWalletsFromRows(rows){
+  return ["MTN","Moov","Celtiis","Espèces"].map(n=>{
+    const r=(rows||[]).find(x=>x.operator===n);
+    return {id:r?.id||n.toLowerCase(),name:n,balance:Number(r?.balance||0)};
+  });
+}
+function mpProfileName(p){return p.full_name||p.name||"Marchand";}
+
+async function mpLoadFromSupabase(){
+  if(!mpSupabase)return false;
+  const u=await mpUser(); if(!u)return false;
+  const me=await mpProfile(u.id);
+  const merchantId=me.role==="merchant"?me.id:me.merchant_id;
+  if(!merchantId)throw new Error("Profil MoneyPro sans marchand de rattachement.");
+
+  const [walletR,opR,expR,prodR,agentR,subR,payR,dayR]=await Promise.all([
+    mpSupabase.from("wallets").select("*").eq("profile_id",u.id),
+    mpSupabase.from("operations").select("*").eq("merchant_id",merchantId).order("created_at",{ascending:false}),
+    mpSupabase.from("expenses").select("*").eq("merchant_id",merchantId).order("created_at",{ascending:false}),
+    mpSupabase.from("inventory_products").select("*").eq("merchant_id",merchantId).order("created_at",{ascending:false}),
+    mpSupabase.from("profiles").select("*").eq("merchant_id",merchantId).eq("role","agent").order("created_at",{ascending:true}),
+    mpSupabase.from("subscriptions").select("*").eq("merchant_id",merchantId).order("created_at",{ascending:false}),
+    mpSupabase.from("subscription_payments").select("*").eq("merchant_id",merchantId).order("created_at",{ascending:false}),
+    mpSupabase.from("business_days").select("*").eq("profile_id",u.id).eq("status","open").order("opened_at",{ascending:false}).limit(1)
+  ]);
+  for(const r of [walletR,opR,expR,prodR,agentR,subR,payR,dayR])if(r.error)throw r.error;
+
+  const agentRows=agentR.data||[];
+  const agentIds=agentRows.map(a=>a.id);
+  let agentWalletRows=[], agentDayRows=[];
+  if(agentIds.length){
+    const [ar,dr]=await Promise.all([
+      mpSupabase.from("wallets").select("*").in("profile_id",agentIds),
+      mpSupabase.from("business_days").select("*").in("profile_id",agentIds).eq("status","open")
+    ]);
+    if(ar.error)throw ar.error;
+    if(dr.error)throw dr.error;
+    agentWalletRows=ar.data||[];
+    agentDayRows=dr.data||[];
+  }
+
+  const ownDay=dayR.data?.[0]||null;
+  const merchantProfileRow=me.role==="merchant"?me:await mpProfile(merchantId);
+  const merchantName=mpProfileName(merchantProfileRow);
+
+  data.merchantProfile={
+    role:"merchant",
+    shopName:merchantProfileRow.shop_name||"Ma boutique Mobile Money",
+    name:merchantName,
+    phone:merchantProfileRow.phone||"",
+    email:merchantProfileRow.email||"",
+    note:merchantProfileRow.note||"",
+    merchantContactPhone:merchantProfileRow.merchant_contact_phone||merchantProfileRow.phone||"",
+    dayStarted:me.role==="merchant"?!!ownDay:false
+  };
+  let merchantWalletRows=[];
+  if(me.role==="merchant") merchantWalletRows=walletR.data||[];
+  else{
+    const mr=await mpSupabase.from("wallets").select("*").eq("profile_id",merchantId);
+    if(mr.error)throw mr.error;
+    merchantWalletRows=mr.data||[];
+  }
+  data.merchantWallets=mpWalletsFromRows(merchantWalletRows);
+
+  const findSub=(accountId,type)=>{
+    const rows=(subR.data||[]).filter(s=>
+      (s.account_id===accountId||s.profile_id===accountId) &&
+      (!type||s.subscriber_type===type)
+    );
+    return rows[0]||null;
+  };
+  const findDay=accountId=>agentDayRows.find(d=>d.profile_id===accountId)||null;
+
+  data.agents=agentRows.map(a=>{
+    const sub=findSub(a.id,"agent")||{};
+    const day=findDay(a.id);
+    const dw=agentWalletRows.filter(w=>w.profile_id===a.id);
+    return {
+      id:a.id,
+      name:mpProfileName(a),
+      phone:a.phone||"",
+      email:a.email||"",
+      status:a.is_active===false?"inactive":"active",
+      merchantId,
+      merchantPhone:merchantProfileRow.phone||"",
+      subscription:{
+        status:sub.status||"inactive",
+        everSubscribed:!!sub.ever_subscribed,
+        price:Number(sub.price||500),
+        startedAt:sub.started_at||sub.starts_at||null,
+        expiresAt:sub.expires_at||null
+      },
+      profile:{
+        role:"agent",
+        name:mpProfileName(a),
+        shopName:merchantProfileRow.shop_name||"",
+        phone:a.phone||"",
+        email:a.email||"",
+        merchantContactPhone:merchantProfileRow.phone||"",
+        dayStarted:!!day,
+        openingDate:day?.opened_at||null,
+        openingBalances:day?.opening_balances||null
+      },
+      wallets:mpWalletsFromRows(dw),
+      createdAt:a.created_at
+    };
+  });
+
+  const ownSub=findSub(u.id,me.role==="agent"?"agent":"merchant")||{};
+  const ownProfile={
+    role:me.role,
+    shopName:me.shop_name||merchantProfileRow.shop_name||"",
+    name:mpProfileName(me),
+    phone:me.phone||"",
+    email:me.email||u.email||"",
+    note:me.note||"",
+    merchantContactPhone:me.merchant_contact_phone||merchantProfileRow.phone||"",
+    dayStarted:!!ownDay,
+    openingDate:ownDay?.opened_at||null,
+    openingBalances:ownDay?.opening_balances||null
+  };
+  data.profile=ownProfile;
+  data.wallets=mpWalletsFromRows(walletR.data||[]);
+
+  const isAgentId=id=>agentRows.some(a=>a.id===id);
+  data.operations=(opR.data||[]).map(o=>{
+    const aid=o.account_owner_id||o.agent_id||null;
+    const owner=aid&&isAgentId(aid)?agentRows.find(a=>a.id===aid):null;
+    return {
+      id:o.id,
+      transactionId:o.transaction_id||"",
+      type:o.type,
+      operator:o.operator,
+      amount:Number(o.amount||0),
+      fee:Number(o.commission||o.fee||0),
+      client:o.client||"",
+      note:o.note||"",
+      agent:owner?mpProfileName(owner):merchantName,
+      agentId:owner?owner.id:null,
+      accountType:owner?"agent":"merchant",
+      createdBy:o.created_by,
+      createdAt:o.created_at,
+      date:o.operation_date||o.created_at
+    };
+  }).filter(o=>me.role==="merchant"||o.agentId===u.id);
+
+  data.expenses=(expR.data||[]).map(x=>{
+    const ownerId=x.owner_id||x.profile_id;
+    const owner=ownerId&&ownerId!==merchantId?agentRows.find(a=>a.id===ownerId):null;
+    return {
+      id:x.id,
+      category:x.category||"Autre",
+      amount:Number(x.amount||0),
+      note:x.note||x.description||"",
+      date:x.expense_date||x.created_at,
+      agent:owner?mpProfileName(owner):merchantName
+    };
+  }).filter(x=>me.role==="merchant"||x.agent===mpProfileName(me));
+
+  data.products=(prodR.data||[]).map(x=>({
+    id:x.id,
+    name:x.name,
+    qty:Number(x.qty??x.quantity??0),
+    threshold:Number(x.threshold||0),
+    buy:Number(x.buy_price||0),
+    sell:Number(x.sell_price??x.unit_price??0)
+  }));
+
+  data.subscription={
+    status:ownSub.status||"inactive",
+    everSubscribed:!!ownSub.ever_subscribed,
+    price:Number(ownSub.price||(me.role==="agent"?500:1000)),
+    startedAt:ownSub.started_at||ownSub.starts_at||null,
+    expiresAt:ownSub.expires_at||null
+  };
+  data.payments=(payR.data||[]).map(x=>{
+    const aid=x.account_id||x.profile_id;
+    const owner=aid&&isAgentId(aid)?agentRows.find(a=>a.id===aid):null;
+    return {
+      id:x.id,
+      date:x.created_at,
+      account:owner?mpProfileName(owner):merchantName,
+      agentId:owner?owner.id:null,
+      amount:Number(x.amount||0),
+      status:x.status||"pending",
+      reference:x.reference||x.provider_transaction_id||"—"
+    };
+  }).filter(x=>me.role==="merchant"||x.agentId===u.id);
+
+  data.merchantId=merchantId;
+  localStorage.setItem("moneypro_role",me.role);
+  if(me.role==="agent")localStorage.setItem("moneypro_agent_id",me.id);
+  else localStorage.removeItem("moneypro_agent_id");
+  restoreSessionAccount();
+  mpDbReady=true;
+  return true;
+}
+
+async function mpSaveProfile(){
+  if(!mpSupabase)return;
+  const u=await mpUser(); if(!u)return;
+  const p=data.profile||{};
+  const payload={
+    full_name:p.name||"",
+    phone:p.phone||"",
+    note:p.note||null,
+    shop_name:p.shopName||null,
+    merchant_contact_phone:p.merchantContactPhone||null,
+    updated_at:new Date().toISOString()
+  };
+  const {error}=await mpSupabase.from("profiles").update(payload).eq("id",u.id);
+  if(error)throw error;
+}
+
+async function mpSaveExpenseLocal(x){
+  const u=await mpUser(); const merchantId=await mpMerchantId();
+  const {data:r,error}=await mpSupabase.from("expenses").insert({
+    merchant_id:merchantId,
+    owner_id:u.id,
+    profile_id:u.id,
+    category:x.category,
+    amount:x.amount,
+    note:x.note||null,
+    description:x.note||null,
+    expense_date:x.date
+  }).select().single();
+  if(error)throw error; x.id=r.id;
+}
+async function mpDeleteExpenseDb(id){
+  const {error}=await mpSupabase.from("expenses").delete().eq("id",id);
+  if(error)throw error;
+}
+async function mpSaveProductLocal(x){
+  const merchantId=await mpMerchantId();
+  const {data:r,error}=await mpSupabase.from("inventory_products").insert({
+    merchant_id:merchantId,name:x.name,quantity:x.qty,unit_price:x.sell||0,
+    qty:x.qty,threshold:x.threshold,buy_price:x.buy,sell_price:x.sell
+  }).select().single();
+  if(error)throw error;x.id=r.id;
+}
+async function mpDeleteProductDb(id){
+  const {error}=await mpSupabase.from("inventory_products").delete().eq("id",id);
+  if(error)throw error;
+}
+async function mpRecordOperationDb(ctx,f){
+  const {data:r,error}=await mpSupabase.rpc("record_operation",{
+    p_account_owner:ctx.id||await mpUserId(),
+    p_type:f.get("type"),
+    p_operator:f.get("operator"),
+    p_amount:Number(f.get("amount")),
+    p_fee:Number(f.get("fee")||0),
+    p_transaction_id:String(f.get("transactionId")||"").trim(),
+    p_client:f.get("client")||null,
+    p_note:f.get("note")||null,
+    p_operation_date:new Date(f.get("date")||Date.now()).toISOString()
+  });
+  if(error)throw error; return r;
+}
+async function mpOpenDayDb(f){
+  const {error}=await mpSupabase.rpc("open_day",{
+    p_mtn:Number(f.mtn)||0,p_moov:Number(f.moov)||0,
+    p_celtiis:Number(f.celtiis)||0,p_cash:Number(f.cash)||0
+  });
+  if(error)throw error;
+}
+async function mpCloseDayDb(){
+  const {error}=await mpSupabase.rpc("close_day");
+  if(error)throw error;
+}
+async function mpDeactivateAgentDb(id){
+  const {error}=await mpSupabase.rpc("deactivate_agent",{p_agent:id});
+  if(error)throw error;
+}
+async function mpCreateAgentDb(payload){
+  const {data:session}=await mpSupabase.auth.getSession();
+  const token=session?.session?.access_token;
+  if(!token)throw new Error("Session Supabase absente.");
+  const r=await fetch(MP_SUPABASE_URL+"/functions/v1/create-agent",{
+    method:"POST",
+    headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},
+    body:JSON.stringify(payload)
+  });
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(j.error||"Création de l'agent impossible.");
+  return j;
+}
+async function mpLoginByPhone(phone,password){
+  const {data:sessionData}=await mpSupabase.auth.getSession();
+  const token=sessionData?.session?.access_token||"";
+  const r=await fetch(MP_SUPABASE_URL+"/functions/v1/login-by-phone",{
+    method:"POST",
+    headers:{"Content-Type":"application/json",...(token?{Authorization:"Bearer "+token}:{})},
+    body:JSON.stringify({phone,password})
+  });
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(j.error||"Connexion par téléphone impossible.");
+  if(!j.access_token||!j.refresh_token)throw new Error("La fonction de connexion n'a pas renvoyé une session valide.");
+  const {error}=await mpSupabase.auth.setSession({access_token:j.access_token,refresh_token:j.refresh_token});
+  if(error)throw error;
+}
+async function mpRefresh(){await mpLoadFromSupabase();showApp();}
+/* AUTH SUPABASE */
+if(mpSupabase){
+  document.getElementById("signupForm").onsubmit=async e=>{
+    e.preventDefault();
+    const password=String(suPass.value||""),password2=String(suPass2.value||""),
+          email=String(suEmail.value||"").trim().toLowerCase(),
+          phone=String(suPhone.value||"").trim();
+    if(password!==password2)return msg("Les deux mots de passe sont différents.");
+    if(!email)return msg("L'adresse email est obligatoire.");
+    if(!phone)return msg("Le numéro de téléphone est obligatoire.");
+    try{
+      const {data,error}=await mpSupabase.auth.signUp({
+        email,
+        password,
+        options:{data:{
+          full_name:suName.value.trim(),
+          name:suName.value.trim(),
+          shop_name:suShop.value.trim(),
+          phone
+        }}
+      });
+      if(error)throw error;
+      if(!data.session){
+        msg("Compte créé. Vérifiez votre email pour confirmer le compte avant de vous connecter.",true);
+        return;
+      }
+      await mpLoadFromSupabase();showApp();
+    }catch(err){msg(mpDbError(err));}
+  };
+
+  document.getElementById("loginForm").onsubmit=async e=>{
+    e.preventDefault();
+    const identifier=String(liEmail.value||"").trim(),password=String(liPass.value||"");
+    try{
+      if(identifier.includes("@")){
+        const {error}=await mpSupabase.auth.signInWithPassword({email:identifier,password});
+        if(error)throw error;
+      }else{
+        await mpLoginByPhone(identifier,password);
+      }
+      await mpLoadFromSupabase();showApp();
+    }catch(err){msg(mpDbError(err));}
+  };
+
+  document.getElementById("forgotForm").onsubmit=async e=>{
+    e.preventDefault();
+    const identifier=String(document.getElementById("forgotEmail")?.value||"").trim().toLowerCase();
+    if(!identifier.includes("@"))return msg("Indiquez une adresse email valide.");
+    try{
+      const {error}=await mpSupabase.auth.resetPasswordForEmail(identifier,{
+        redirectTo:location.origin+location.pathname
+      });
+      if(error)throw error;
+      msg("Lien de réinitialisation envoyé. Ouvrez-le directement dans votre navigateur.",true);
+    }catch(err){msg(mpDbError(err));}
+  };
+
+  document.getElementById("resetForm").onsubmit=async e=>{
+    e.preventDefault();
+    const p1=String(document.getElementById("resetPass").value||""),
+          p2=String(document.getElementById("resetPass2").value||"");
+    if(p1.length<6)return msg("Le nouveau mot de passe doit contenir au moins 6 caractères.");
+    if(p1!==p2)return msg("Les deux mots de passe sont différents.");
+    try{
+      const {error}=await mpSupabase.auth.updateUser({password:p1});
+      if(error)throw error;
+      msg("Mot de passe modifié. Vous pouvez maintenant vous connecter.",true);
+      setTimeout(()=>authView("login"),1200);
+    }catch(err){msg(mpDbError(err));}
+  };
+
+  mpSupabase.auth.onAuthStateChange(async(event,session)=>{
+    if(event==="PASSWORD_RECOVERY"){
+      document.getElementById("app").classList.add("hidden");
+      document.getElementById("authScreen").classList.remove("hidden");
+      authView("reset");
+      return;
+    }
+    if(session && (event==="SIGNED_IN"||event==="INITIAL_SESSION")){
+      try{await mpLoadFromSupabase();showApp();}catch(e){console.error(e);}
+    }
+    if(event==="SIGNED_OUT"){
+      document.getElementById("app").classList.add("hidden");
+      document.getElementById("authScreen").classList.remove("hidden");
+      authView("login");
+    }
+  });
+
+  const _oldLogout=logout;
+  logout=async function(){
+    try{await mpSupabase.auth.signOut();}catch(e){console.error(e)}
+    localStorage.removeItem("moneypro_role");
+    localStorage.removeItem("moneypro_agent_id");
+    localStorage.removeItem("moneypro_session");
+  };
+  /* Opérations: le solde et l'écriture sont gérés atomiquement par PostgreSQL. */
+  openOperation=async function(){
+    const role=mpRole(); if(role==="agent"&&!agentSubscriptionActive()){alert("Votre abonnement agent n'est pas actif.");return;} if(role==="agent"&&!getDay()?.open){openDayStart();return;}
+    const options=role==="merchant"?data.agents.filter(a=>a.status!=="inactive").map(a=>`<option value="${esc(a.id)}">${esc(a.name)}</option>`).join(""):"";
+    openModal("Nouvelle opération",`<div class="notice">La commission est saisie manuellement. Supabase vérifie l'abonnement, la journée, le solde et l'ID transaction avant d'enregistrer le mouvement.</div><form id="operationForm" class="form-grid" style="margin-top:13px"><div class="field full"><label>Compte concerné</label><select id="opTargetAgent" name="targetAgent"><option value="">Compte marchand</option>${options}</select></div><div class="field"><label>Type d'opération</label><select name="type" required><option>Dépôt</option><option>Retrait</option><option>Vente de crédit</option><option>Vente de forfait</option></select></div><div class="field"><label>Compte opérateur</label><select name="operator" required><option>MTN</option><option>Moov</option><option>Celtiis</option></select></div><div class="field"><label>Montant</label><input name="amount" type="number" min="1" required></div><div class="field"><label>ID transaction</label><input name="transactionId" required autocomplete="off"></div><div class="field"><label>Commission</label><input name="fee" type="number" min="0" value="0"></div><div class="field"><label>Client / numéro</label><input name="client"></div><div class="field"><label>Date</label><input name="date" type="datetime-local" value="${new Date().toISOString().slice(0,16)}"></div><div class="field full"><label>Observation</label><textarea name="note" rows="3"></textarea></div><div class="field full"><div class="actions"><button type="button" class="btn gray" onclick="closeModal()">Annuler</button><button class="btn">Enregistrer</button></div></div></form>`);
+    if(role!=="merchant")document.getElementById("opTargetAgent").style.display="none";
+    document.getElementById("operationForm").onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);let account=String(f.get("targetAgent")||"");let ownerId=account;if(!ownerId)ownerId=role==="agent"?await mpUserId():await mpMerchantId();const ctx={id:ownerId};try{await mpRecordOperationDb(ctx,f);await mpLoadFromSupabase();closeModal();renderAll();alert("Opération enregistrée.");}catch(err){alert(mpDbError(err));}};
+  };
+
+  deleteOperation=async function(){alert("Les opérations Supabase sont conservées pour la traçabilité. Une correction devra être enregistrée par contre-mouvement plutôt que supprimer l'écriture.");};
+
+  openExpense=function(){openModal("Nouvelle dépense",`<form id="expenseForm"><div class="field"><label>Catégorie</label><select name="category"><option>Loyer</option><option>Électricité</option><option>Internet</option><option>Transport</option><option>Approvisionnement</option><option>Salaire</option><option>Autre</option></select></div><div class="field"><label>Montant</label><input name="amount" type="number" min="1" required></div><div class="field"><label>Observation</label><textarea name="note"></textarea></div><div class="actions"><button type="button" class="btn gray" onclick="closeModal()">Annuler</button><button class="btn">Enregistrer</button></div></form>`);document.getElementById("expenseForm").onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target),x={category:f.get("category"),amount:Number(f.get("amount")),note:f.get("note"),date:isoNow()};try{await mpSaveExpenseLocal(x);await mpLoadFromSupabase();closeModal();renderAll();}catch(err){alert(mpDbError(err));}}};
+  deleteExpense=async function(id){if(confirm("Supprimer cette dépense ?")){try{await mpDeleteExpenseDb(id);await mpLoadFromSupabase();renderAll();}catch(e){alert(mpDbError(e));}}};
+  openProduct=function(){openModal("Nouveau produit",`<form id="productForm" class="form-grid"><div class="field"><label>Produit</label><input name="name" required></div><div class="field"><label>Quantité</label><input name="qty" type="number" min="0" value="0"></div><div class="field"><label>Seuil</label><input name="threshold" type="number" min="0" value="5"></div><div class="field"><label>Prix achat</label><input name="buy" type="number" min="0"></div><div class="field"><label>Prix vente</label><input name="sell" type="number" min="0"></div><div class="full actions"><button type="button" class="btn gray" onclick="closeModal()">Annuler</button><button class="btn">Enregistrer</button></div></form>`);document.getElementById("productForm").onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target),x={name:f.get("name"),qty:Number(f.get("qty"))||0,threshold:Number(f.get("threshold"))||0,buy:Number(f.get("buy"))||0,sell:Number(f.get("sell"))||0};try{await mpSaveProductLocal(x);await mpLoadFromSupabase();closeModal();renderAll();}catch(err){alert(mpDbError(err));}}};
+  deleteProduct=async function(id){if(confirm("Supprimer ce produit ?")){try{await mpDeleteProductDb(id);await mpLoadFromSupabase();renderAll();}catch(e){alert(mpDbError(e));}}};
+
+  save=async function(){try{persistCurrentAccount();await mpSaveProfile();renderAll();}catch(e){console.error(e);alert(mpDbError(e));}};
+  saveDayOpening=async function(){const f={mtn:openingMTN.value,moov:openingMoov.value,celtiis:openingCeltiis.value,cash:openingCash.value};try{await mpOpenDayDb(f);await mpLoadFromSupabase();renderAll();updateDayUI();alert("Journée ouverte.");}catch(e){alert(mpDbError(e));}};
+  closeDayEntry=async function(){try{await mpCloseDayDb();await mpLoadFromSupabase();renderAll();updateDayUI();alert("Journée clôturée.");}catch(e){alert(mpDbError(e));}};
+  deactivateAgent=async function(id){if(confirm("Désactiver cet agent ? Son historique sera conservé.")){try{await mpDeactivateAgentDb(id);await mpLoadFromSupabase();renderAll();}catch(e){alert(mpDbError(e));}}};
+  openAgent=function(){openModal("Créer un agent",`<form id="agentForm" class="form-grid"><div class="notice full">L’agent aura son propre compte Supabase, ses propres portefeuilles et son abonnement de 500 F CFA/mois.</div><div class="field"><label>Nom complet</label><input name="name" required></div><div class="field"><label>Téléphone</label><input name="phone" required></div><div class="field"><label>Email de connexion</label><input name="email" type="email" required></div><div class="actions full"><button type="button" class="btn gray" onclick="closeModal()">Annuler</button><button class="btn">Créer l’agent</button></div></form>`);document.getElementById("agentForm").onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);try{const r=await mpCreateAgentDb({name:String(f.get("name")).trim(),phone:String(f.get("phone")).trim(),email:String(f.get("email")).trim().toLowerCase()});await mpLoadFromSupabase();closeModal();openModal("Agent créé",`<div class="notice"><b>${esc(r.name||f.get("name"))}</b> a été créé.</div><div class="stat-row"><span>Email</span><b>${esc(r.email||f.get("email"))}</b></div>${r.temporary_password?`<div class="stat-row"><span>Mot de passe temporaire</span><b>${esc(r.temporary_password)}</b></div>`:""}<div class="notice warning" style="margin-top:12px">L’agent devra modifier son mot de passe lors de sa première connexion.</div><div class="actions"><button class="btn" onclick="closeModal()">Fermer</button></div>`);}catch(err){alert(mpDbError(err));}}};
+
+  /* Abonnements : aucune activation locale. La confirmation devra venir de l'Edge Function FedaPay. */
+  simulatePayment=function(){alert("En mode Supabase, un abonnement ne peut pas être activé depuis le navigateur. Le paiement sera confirmé par FedaPay puis activé par l'Edge Function/webhook.");};
+
+  document.addEventListener("DOMContentLoaded",async()=>{try{if((await mpUser())){await mpLoadFromSupabase();showApp();}}catch(e){console.error(e);}});
+}
 </script>
 </body>
 </html>
