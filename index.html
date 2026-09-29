@@ -6,6 +6,8 @@
 <meta name="theme-color" content="#0b1020">
 <title>MoneyPro — Gestion Mobile Money</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
 <style>
 :root{--bg:#f4f6fa;--card:#fff;--ink:#101828;--muted:#667085;--line:#e4e7ec;--blue:#155eef;--blue2:#0b4acb;--green:#12b76a;--red:#f04438;--orange:#f79009;--nav:#0b1020;--shadow:0 10px 30px #10182812}
 *{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink)}
@@ -39,7 +41,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:
       <div class="field"><label>Nom du marchand / entreprise</label><input id="suShop" required placeholder="Ex. Boutique Pedro"></div>
       <div class="field"><label>Nom complet</label><input id="suName" required placeholder="Votre nom"></div>
       <div class="field"><label>Téléphone</label><input id="suPhone" required placeholder="+229..."></div>
-      <div class="field"><label>Email</label><input id="suEmail" type="email" placeholder="email@exemple.com" required></div>
+      <div class="field"><label>Email</label><input id="suEmail" type="email" required placeholder="email@exemple.com"></div>
       <div class="field"><label>Mot de passe</label><input id="suPass" type="password" minlength="6" required></div>
       <div class="field"><label>Confirmer le mot de passe</label><input id="suPass2" type="password" minlength="6" required></div>
       <button class="btn" style="width:100%">Créer mon compte</button>
@@ -58,8 +60,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:
       <div style="text-align:center;margin-top:12px"><button type="button" class="link" onclick="authView('login')">← Retour à la connexion</button></div>
     </form>
     <div id="authMsg" class="msg"></div>
-    <div class="footer-note">Mode de démonstration local disponible avant la création de Supabase.</div>
-    <button class="btn secondary" style="width:100%;margin-top:14px" onclick="demoLogin()">Tester l'application en mode démo</button>
+    <div class="footer-note">MoneyPro — Gestion sécurisée des opérations Mobile Money.</div>
   </div>
 </div>
 
@@ -84,7 +85,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:
 
 <main class="main">
 <div class="top">
-  <div class="top-left"><button class="mobile-menu" onclick="toggleSidebar()">☰</button><div><h1 id="pageTitle">Tableau de bord</h1><div class="status"><span class="dot"></span><span id="connectionText">Mode local — synchronisation à venir</span></div></div></div>
+  <div class="top-left"><button class="mobile-menu" onclick="toggleSidebar()">☰</button><div><h1 id="pageTitle">Tableau de bord</h1><div class="status"><span class="dot"></span><span id="connectionText">Connexion sécurisée à Supabase</span></div></div></div>
   <button id="newOperationBtn" class="btn" onclick="openOperation()">+ Nouvelle opération</button>
 </div>
 
@@ -124,7 +125,11 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:
 <section id="operations" class="page">
 <div class="card">
   <div id="dayStartNotice"></div>
-  <div class="section-title"><h2>Journal des mouvements</h2><button class="btn" onclick="openOperation()">+ Ajouter</button></div>
+  <div class="section-title"><h2>Journal des mouvements</h2>
+<div class="actions">
+<button class="btn secondary" onclick="downloadHistoryPDF()">📄 Télécharger l'historique PDF</button>
+<button class="btn" onclick="openOperation()">+ Ajouter</button>
+</div></div>
   <div class="notice" style="margin-bottom:14px"><b>Règle de caisse :</b> dépôt, vente de crédit et vente de forfait diminuent le compte opérateur et augmentent les espèces. Un retrait fait l'inverse. Les commissions sont toujours saisies manuellement.</div>
   <div class="toolbar"><input id="opSearch" placeholder="Rechercher..." oninput="renderOperations()"><select id="opFilter" onchange="renderOperations()"><option value="">Tous les types</option><option>Dépôt</option><option>Retrait</option><option>Vente de crédit</option><option>Vente de forfait</option></select><select id="netFilter" onchange="renderOperations()"><option value="">Tous les comptes</option><option>MTN</option><option>Moov</option><option>Celtiis</option></select></div>
   <div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>ID transaction</th><th>Type</th><th>Opérateur</th><th>Client</th><th>Montant</th><th>Commission</th><th>Agent</th><th>Observation</th><th></th></tr></thead><tbody id="opsTable"></tbody></table></div>
@@ -260,7 +265,6 @@ function authView(v){
  document.getElementById("authSubtitle").textContent=v==="forgot"?"Recevez un lien sécurisé de réinitialisation.":"Gérez vos opérations Mobile Money, votre caisse et votre stock.";
  msg("");
 }
-if(new URLSearchParams(location.search).get("confirmed")==="1") authView("login");
 document.getElementById("signupForm").onsubmit=e=>{
  e.preventDefault();
  let p1=suPass.value,p2=suPass2.value;
@@ -288,7 +292,6 @@ document.getElementById("loginForm").onsubmit=e=>{
  msg("Compte introuvable ou identifiants incorrects.");
 };
 document.getElementById("forgotForm").onsubmit=e=>{e.preventDefault();msg("En mode local, aucune adresse n'est réellement envoyée. Avec Supabase, un lien sécurisé sera envoyé automatiquement.",true)};
-function demoLogin(){switchToMerchant();localStorage.setItem("moneypro_session","1");showApp()}
 function showApp(){restoreSessionAccount();document.getElementById("authScreen").classList.add("hidden");document.getElementById("app").classList.remove("hidden");loadSettings();renderAll();configureAgentView();populateMerchantAgentSelector()}
 function logout(){persistCurrentAccount();switchToMerchant();localStorage.removeItem("moneypro_session");document.getElementById("app").classList.add("hidden");document.getElementById("authScreen").classList.remove("hidden");authView("login")}
 function resetAll(){if(confirm("Effacer toutes les données locales ?")){localStorage.removeItem(STORAGE);location.reload()}}
@@ -520,19 +523,22 @@ function renderDashboard(){
  let ops=visibleOperations().filter(x=>today(x.date)),vol=ops.reduce((s,x)=>s+x.amount,0),fees=ops.reduce((s,x)=>s+x.fee,0),total=data.wallets.reduce((s,w)=>s+w.balance,0);
  totalBalance.textContent=money(total);cashBalance.textContent=money(findWallet("Espèces").balance);todayOps.textContent=ops.length;todayVolume.textContent=money(vol);todayFees.textContent=money(fees);
  let recent=visibleOperations().slice(0,8); recentOps.innerHTML=recent.length?recent.map(o=>`<tr><td>${fmt(o.date)}</td><td>${esc(o.type)}</td><td>${esc(o.operator)}</td><td>${money(o.amount)}</td><td class="positive">${money(o.fee)}</td></tr>`).join(""):`<tr><td colspan="5" class="empty">Aucune opération.</td></tr>`;
- let s=data.subscription,active=s.status==="active"&&(!s.expiresAt||new Date(s.expiresAt)>new Date());
- dashSubStatus.textContent=active?"Actif":"Expiré / inactif";dashSubDate.textContent=s.expiresAt?"Expire le "+fmt(s.expiresAt):"Aucun abonnement actif";
+ let s=data.subscription,trial=s.status==="trial"&&!s.everSubscribed&&s.expiresAt&&new Date(s.expiresAt)>new Date(),active=s.status==="active"&&(!s.expiresAt||new Date(s.expiresAt)>new Date());
+ dashSubStatus.textContent=trial?"Essai gratuit":""+(active?"Actif":"Expiré / inactif");
+ dashSubDate.textContent=s.expiresAt?(trial?"Essai jusqu’au "+fmt(s.expiresAt):"Expire le "+fmt(s.expiresAt)):"Aucun abonnement actif";
 }
 function renderSubscription(){
  const isAgent=mpRole()==="agent",a=getCurrentAgent(),s=isAgent?(a?.subscription||{status:"inactive",everSubscribed:false,expiresAt:null}):data.subscription,first=isAgent?false:!s.everSubscribed,price=isAgent?500:(first?1000:2000);
- subPrice.textContent=money(price)+" / mois";subState.textContent=s.status==="active"&&(!s.expiresAt||new Date(s.expiresAt)>new Date())?"Actif":"Inactif";subExpires.textContent=s.expiresAt?"Expire le "+fmt(s.expiresAt):"Aucune date d'expiration";
+ const trial=s.status==="trial"&&!s.everSubscribed&&s.expiresAt&&new Date(s.expiresAt)>new Date();
+ subPrice.textContent=trial?"Essai gratuit — 3 jours":money(price)+" / mois";
+ subState.textContent=trial?"Essai gratuit actif":(s.status==="active"&&(!s.expiresAt||new Date(s.expiresAt)>new Date())?"Actif":"Inactif");
+ subExpires.textContent=s.expiresAt?(trial?"Essai jusqu’au "+fmt(s.expiresAt):"Expire le "+fmt(s.expiresAt)):"Aucune date d'expiration";
  paymentsTable.innerHTML=data.payments.filter(p=>!isAgent||p.agentId===a?.id).length?data.payments.filter(p=>!isAgent||p.agentId===a?.id).map(p=>`<tr><td>${fmt(p.date)}</td><td>${esc(p.account)}</td><td>${money(p.amount)}</td><td><span class="badge green">${esc(p.status)}</span></td><td>${esc(p.reference)}</td></tr>`).join(""):`<tr><td colspan="5" class="empty">Aucun paiement.</td></tr>`;
 }
 
 /* GLOBAL */
 function renderAll(){loadSettings();renderDashboard();renderOperations();renderWallets();renderExpenses();renderInventory();renderAgents();renderReports();renderSubscription()}
-if(localStorage.getItem("moneypro_session")==="1")showApp();
-else document.getElementById("authScreen").classList.remove("hidden");
+document.getElementById("authScreen").classList.remove("hidden");
 
 function getMerchantPhone(){ return String(data.profile.merchantContactPhone||"").trim(); }
 function saveMerchantPhone(){ const el=document.getElementById("merchantContactPhone"); if(!el) return; data.profile.merchantContactPhone=el.value.trim(); save(); }
@@ -667,8 +673,8 @@ document.addEventListener("DOMContentLoaded",prepareOperationAgentField);
    La clé SERVICE_ROLE et les secrets FedaPay ne doivent JAMAIS être
    placés dans ce fichier.
    ================================================================ */
-const MP_SUPABASE_URL = window.MONEYPRO_SUPABASE_URL || "https://VOTRE-PROJET.supabase.co";
-const MP_SUPABASE_ANON_KEY = window.MONEYPRO_SUPABASE_ANON_KEY || "VOTRE_CLE_ANON";
+const MP_SUPABASE_URL = window.MONEYPRO_SUPABASE_URL || "https://dadqzjhruibpcgwrftvs.supabase.co";
+const MP_SUPABASE_ANON_KEY = window.MONEYPRO_SUPABASE_ANON_KEY || "sb_publishable_h_xd_C06XsatQ1DXwjzXIA_suOwP8qR";
 const MP_SUPABASE_CONFIGURED = !MP_SUPABASE_URL.includes("VOTRE-PROJET") && !MP_SUPABASE_ANON_KEY.includes("VOTRE_CLE_ANON");
 let mpSupabase = null;
 let mpDbReady = false;
@@ -768,18 +774,57 @@ async function mpCreateAgentDb(payload){
 }
 async function mpRefresh(){await mpLoadFromSupabase();showApp();}
 
+/* ESSAI GRATUIT — 3 JOURS, démarre uniquement après confirmation email */
+async function mpStartMerchantTrial(userId){
+  const now=new Date();
+  const expires=new Date(now.getTime()+3*24*60*60*1000);
+  const existing=await mpSupabase.from("subscriptions").select("id,status,ever_subscribed,expires_at").eq("account_id",userId).eq("subscriber_type","merchant").order("created_at",{ascending:false}).limit(1);
+  if(existing.error)throw existing.error;
+  const row=existing.data?.[0];
+  if(row && row.ever_subscribed)return row;
+  if(row && row.status==="trial" && row.expires_at)return row;
+  const {data,error}=await mpSupabase.from("subscriptions").insert({
+    profile_id:userId,merchant_id:userId,account_id:userId,subscriber_type:"merchant",
+    amount:0,price:0,status:"trial",ever_subscribed:false,
+    starts_at:now.toISOString(),started_at:now.toISOString(),expires_at:expires.toISOString()
+  }).select().single();
+  if(error)throw error;
+  return data;
+}
+function mpMerchantTrialActive(){
+  const s=data.subscription||{};
+  return s.status==="trial" && !!s.expiresAt && new Date(s.expiresAt)>new Date() && !s.everSubscribed;
+}
+function mpMerchantPaidActive(){
+  const s=data.subscription||{};
+  return s.status==="active" && !!s.expiresAt && new Date(s.expiresAt)>new Date();
+}
+function mpMerchantCanOperate(){
+  return mpMerchantTrialActive()||mpMerchantPaidActive();
+}
+
 /* AUTH SUPABASE */
 if(mpSupabase){
   document.getElementById("signupForm").onsubmit=async e=>{
     e.preventDefault();
     const password=String(suPass.value||""),password2=String(suPass2.value||""),email=String(suEmail.value||"").trim().toLowerCase(),phone=String(suPhone.value||"").trim();
     if(password!==password2)return msg("Les deux mots de passe sont différents.");
-    if(!email)return msg("L'adresse email est obligatoire : elle est utilisée pour la confirmation du compte.");
+    if(!email)return msg("L’adresse email est obligatoire pour confirmer votre compte.");
     try{
-      const credentials={email,password,options:{data:{name:suName.value.trim(),shop_name:suShop.value.trim(),phone},emailRedirectTo:"https://moneypro.phenixconnect.online/?confirmed=1"}};
+      const credentials={email,password,options:{data:{name:suName.value.trim(),shop_name:suShop.value.trim(),phone},emailRedirectTo:"https://moneypro.phenixconnect.online"}};
       const {data,error}=await mpSupabase.auth.signUp(credentials); if(error)throw error;
-      if(!data.session){msg("Compte créé. Vérifiez votre email si la confirmation est activée dans Supabase.",true);return;}
-      await mpLoadFromSupabase();showApp();
+      if(data.user && !data.session){
+        localStorage.removeItem("moneypro_session");
+        msg("Compte créé. Un email de confirmation vient d’être envoyé. Confirmez votre adresse avant de vous connecter.",true);
+        return;
+      }
+      if(data.session){
+        await mpSupabase.auth.signOut();
+        localStorage.removeItem("moneypro_session");
+        authView("login");
+        msg("Compte créé. Vérifiez votre email avant de vous connecter.",true);
+        return;
+      }
     }catch(err){msg(mpDbError(err));}
   };
   document.getElementById("loginForm").onsubmit=async e=>{
@@ -793,9 +838,22 @@ if(mpSupabase){
     try{const {error}=await mpSupabase.auth.resetPasswordForEmail(identifier,{redirectTo:"https://moneypro.phenixconnect.online"});if(error)throw error;msg("Lien de réinitialisation envoyé.",true);}catch(err){msg(mpDbError(err));}
   };
   mpSupabase.auth.onAuthStateChange(async(event,session)=>{
-    if(new URLSearchParams(location.search).get("confirmed")==="1"){
-      if(session && (event==="SIGNED_IN"||event==="INITIAL_SESSION")){try{await mpSupabase.auth.signOut();}catch(e){console.error(e);}}
-      document.getElementById("app").classList.add("hidden");document.getElementById("authScreen").classList.remove("hidden");authView("login");
+    const isSignupConfirmation=event==="SIGNED_IN" && session && /(?:^|[&#?])type=signup(?:[&#]|$)/.test(window.location.hash);
+    if(isSignupConfirmation){
+      try{
+        await mpStartMerchantTrial(session.user.id);
+        await mpSupabase.auth.signOut();
+        localStorage.removeItem("moneypro_session");
+        document.getElementById("app").classList.add("hidden");
+        document.getElementById("authScreen").classList.remove("hidden");
+        authView("login");
+        history.replaceState({},document.title,"https://moneypro.phenixconnect.online/");
+        window.location.hash="";
+        msg("Adresse email confirmée. Votre essai gratuit de 3 jours commence maintenant. Vous pouvez vous connecter.",true);
+      }catch(e){
+        console.error(e);
+        msg("Adresse email confirmée, mais l’activation de l’essai gratuit a échoué. Réessayez ou contactez l’administration.");
+      }
       return;
     }
     if(session && (event==="SIGNED_IN"||event==="INITIAL_SESSION")){try{await mpLoadFromSupabase();showApp();}catch(e){console.error(e);}}
@@ -806,7 +864,9 @@ if(mpSupabase){
 
   /* Opérations: le solde et l'écriture sont gérés atomiquement par PostgreSQL. */
   openOperation=async function(){
-    const role=mpRole(); if(role==="agent"&&!agentSubscriptionActive()){alert("Votre abonnement agent n'est pas actif.");return;} if(role==="agent"&&!getDay()?.open){openDayStart();return;}
+    const role=mpRole();
+    if(role==="merchant"&&!mpMerchantCanOperate()){alert("Votre essai gratuit de 3 jours est terminé. Souscrivez à votre abonnement pour continuer.");return;}
+    if(role==="agent"&&!agentSubscriptionActive()){alert("Votre abonnement agent n'est pas actif.");return;} if(role==="agent"&&!getDay()?.open){openDayStart();return;}
     const options=role==="merchant"?data.agents.filter(a=>a.status!=="inactive").map(a=>`<option value="${esc(a.id)}">${esc(a.name)}</option>`).join(""):"";
     openModal("Nouvelle opération",`<div class="notice">La commission est saisie manuellement. Supabase vérifie l'abonnement, la journée, le solde et l'ID transaction avant d'enregistrer le mouvement.</div><form id="operationForm" class="form-grid" style="margin-top:13px"><div class="field full"><label>Compte concerné</label><select id="opTargetAgent" name="targetAgent"><option value="">Compte marchand</option>${options}</select></div><div class="field"><label>Type d'opération</label><select name="type" required><option>Dépôt</option><option>Retrait</option><option>Vente de crédit</option><option>Vente de forfait</option></select></div><div class="field"><label>Compte opérateur</label><select name="operator" required><option>MTN</option><option>Moov</option><option>Celtiis</option></select></div><div class="field"><label>Montant</label><input name="amount" type="number" min="1" required></div><div class="field"><label>ID transaction</label><input name="transactionId" required autocomplete="off"></div><div class="field"><label>Commission</label><input name="fee" type="number" min="0" value="0"></div><div class="field"><label>Client / numéro</label><input name="client"></div><div class="field"><label>Date</label><input name="date" type="datetime-local" value="${new Date().toISOString().slice(0,16)}"></div><div class="field full"><label>Observation</label><textarea name="note" rows="3"></textarea></div><div class="field full"><div class="actions"><button type="button" class="btn gray" onclick="closeModal()">Annuler</button><button class="btn">Enregistrer</button></div></div></form>`);
     if(role!=="merchant")document.getElementById("opTargetAgent").style.display="none";
@@ -829,7 +889,13 @@ if(mpSupabase){
   /* Abonnements : aucune activation locale. La confirmation devra venir de l'Edge Function FedaPay. */
   simulatePayment=function(){alert("En mode Supabase, un abonnement ne peut pas être activé depuis le navigateur. Le paiement sera confirmé par FedaPay puis activé par l'Edge Function/webhook.");};
 
-  document.addEventListener("DOMContentLoaded",async()=>{try{if((await mpUser())){await mpLoadFromSupabase();showApp();}}catch(e){console.error(e);}});
+  document.addEventListener("DOMContentLoaded",async()=>{
+    try{
+      const confirmed=new URLSearchParams(window.location.search).get("confirmed")==="1";
+      if(confirmed){authView("login");return;}
+      if((await mpUser())){await mpLoadFromSupabase();showApp();}
+    }catch(e){console.error(e);}
+  });
 }
 </script>
 </body>
