@@ -179,8 +179,8 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:
 
 <section id="subscription" class="page">
 <div class="grid sections">
-<div class="subscription"><div class="muted" style="font-size:11px">ABONNEMENT MARCHAND</div><div style="font-size:28px;font-weight:900;margin:8px 0" id="subPrice">2 000 F / mois</div><div class="muted" id="subState">Actif</div><div class="muted" id="subExpires" style="margin-top:5px">Expire le —</div><button class="btn" style="margin-top:16px;background:#fff;color:#155eef" onclick="startSubscription('merchant')">Se réabonner via FedaPay</button></div>
-<div class="card"><h2>Tarification</h2><div class="plan active"><h3>Marchand</h3><div class="plan-price">1 000 F</div><small>Premier abonnement d'un nouveau compte</small><div style="margin-top:9px;font-weight:700">Puis 2 000 F / mois</div></div><div class="plan" style="margin-top:12px"><h3>Agent</h3><div class="plan-price">1 000 F</div><small>Par agent et par mois, séparément du marchand</small></div></div>
+<div class="subscription"><div class="muted" style="font-size:11px" id="subLabel">ABONNEMENT</div><div style="font-size:28px;font-weight:900;margin:8px 0" id="subPrice">2 000 F / mois</div><div id="subState"><span class="badge green">Actif</span></div><div class="muted" id="subExpires" style="margin-top:8px">Expire le —</div><div class="muted" id="subRemaining" style="margin-top:4px"></div><button id="subAction" class="btn" style="margin-top:16px;background:#fff;color:#155eef" onclick="startSubscription('merchant')">S'abonner via FedaPay</button></div>
+<div class="card"><h2>Tarification</h2><div class="plan active"><h3>Marchand</h3><div class="plan-price">1 000 F</div><small>Premier abonnement après l'essai</small><div style="margin-top:9px;font-weight:700">Puis 2 000 F / mois</div></div><div class="plan" style="margin-top:12px"><h3>Agent rattaché</h3><div class="plan-price">500 F</div><small>Par agent et par mois</small></div><div class="plan" style="margin-top:12px"><h3>Agent indépendant</h3><div class="plan-price">1 000 F</div><small>Par mois, sans marchand de rattachement</small></div></div>
 </div>
 <div class="card" style="margin-top:15px"><h2>Historique des paiements</h2><div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Compte</th><th>Montant</th><th>Statut</th><th>Référence</th></tr></thead><tbody id="paymentsTable"></tbody></table></div></div>
 </section>
@@ -539,17 +539,63 @@ function visibleOperations(){
  const role=mpRole(),aid=localStorage.getItem("moneypro_agent_id")||"";
  return role==="agent"?data.operations.filter(o=>o.agentId===aid):data.operations;
 }
+function subscriptionDisplay(s){
+ const now=new Date();
+ const expiry=s?.expiresAt?new Date(s.expiresAt):null;
+ const validExpiry=expiry&&!Number.isNaN(expiry.getTime());
+ const active=s?.status==="active" && (!validExpiry || expiry>now);
+ const trial=active && !s?.everSubscribed && validExpiry;
+ const pending=s?.status==="pending";
+ const expired=validExpiry && expiry<=now;
+ if(trial){
+   const ms=expiry-now; const days=Math.max(0,Math.ceil(ms/86400000));
+   return {key:"trial",label:"Essai gratuit",badge:"orange",date:"Essai jusqu'au "+fmt(s.expiresAt),remaining:days>1?days+" jours restants":days===1?"1 jour restant":"Essai arrivant à expiration",active:false};
+ }
+ if(pending) return {key:"pending",label:"Paiement en attente",badge:"orange",date:validExpiry?"Expire le "+fmt(s.expiresAt):"En attente de confirmation FedaPay",remaining:"Le paiement sera activé après confirmation.",active:false};
+ if(active) return {key:"active",label:"Actif",badge:"green",date:validExpiry?"Expire le "+fmt(s.expiresAt):"Abonnement actif",remaining:"",active:true};
+ if(expired || s?.status==="expired") return {key:"expired",label:"Abonnement expiré",badge:"red",date:"Expiré le "+fmt(s.expiresAt),remaining:"Effectuez un paiement pour réactiver votre abonnement.",active:false};
+ return {key:"inactive",label:"Inactif",badge:"red",date:"Aucun abonnement actif",remaining:"Abonnement requis pour effectuer des opérations.",active:false};
+}
+function paymentStatusDisplay(status){
+ const k=String(status||"pending").toLowerCase();
+ if(["paid","approved","transferred","success","successful"].includes(k))return ["Payé","green"];
+ if(["pending","processing","in_progress"].includes(k))return ["En attente","orange"];
+ if(["failed","declined","canceled","cancelled","expired"].includes(k))return [k==="expired"?"Expiré":"Échec / annulé","red"];
+ return [status||"Inconnu","orange"];
+}
+function renderSubscriptionSummary(target,s,price,isAgent){
+ const v=subscriptionDisplay(s);
+ if(target==="dashboard"){
+   dashSubStatus.innerHTML=`<span class="badge ${v.badge}">${v.label}</span>`;
+   dashSubDate.textContent=v.date+(v.remaining?" — "+v.remaining:"");
+   return;
+ }
+ subPrice.textContent=money(price)+" / mois";
+ subState.innerHTML=`<span class="badge ${v.badge}">${v.label}</span>`;
+ subExpires.textContent=v.date;
+ subRemaining.textContent=v.remaining||"";
+ const action=document.getElementById("subAction");
+ if(action){
+   action.textContent=v.key==="pending"?"Paiement en cours":(v.active?"Renouveler via FedaPay":"S'abonner via FedaPay");
+   action.disabled=v.key==="pending";
+   action.style.opacity=action.disabled?".65":"1";
+   action.onclick=()=>{if(!action.disabled)startSubscription(isAgent?"agent":"merchant",isAgent?(getCurrentAgent()?.id||null):null)};
+ }
+}
 function renderDashboard(){
  let ops=visibleOperations().filter(x=>today(x.date)),vol=ops.reduce((s,x)=>s+x.amount,0),fees=ops.reduce((s,x)=>s+x.fee,0),total=data.wallets.reduce((s,w)=>s+w.balance,0);
  totalBalance.textContent=money(total);cashBalance.textContent=money(findWallet("Espèces").balance);todayOps.textContent=ops.length;todayVolume.textContent=money(vol);todayFees.textContent=money(fees);
  let recent=visibleOperations().slice(0,8); recentOps.innerHTML=recent.length?recent.map(o=>`<tr><td>${fmt(o.date)}</td><td>${esc(o.type)}</td><td>${esc(o.operator)}</td><td>${money(o.amount)}</td><td class="positive">${money(o.fee)}</td></tr>`).join(""):`<tr><td colspan="5" class="empty">Aucune opération.</td></tr>`;
- let s=data.subscription,active=s.status==="active"&&(!s.expiresAt||new Date(s.expiresAt)>new Date());
- dashSubStatus.textContent=active?"Actif":"Expiré / inactif";dashSubDate.textContent=s.expiresAt?"Expire le "+fmt(s.expiresAt):"Aucun abonnement actif";
+ let isAgent=mpRole()==="agent",a=getCurrentAgent(),s=isAgent?(a?.subscription||data.subscription||{}):data.subscription||{};
+ renderSubscriptionSummary("dashboard",s,Number(s.price|| (isAgent?(a?.merchantId?500:1000):(!s.everSubscribed?1000:2000))),isAgent);
 }
 function renderSubscription(){
- const isAgent=mpRole()==="agent",a=getCurrentAgent(),s=isAgent?(a?.subscription||data.subscription||{status:"inactive",everSubscribed:false,expiresAt:null}):data.subscription,first=isAgent?false:!s.everSubscribed,price=isAgent?(data.subscription?.price||500):(first?1000:2000);
- subPrice.textContent=money(price)+" / mois";subState.textContent=s.status==="active"&&(!s.expiresAt||new Date(s.expiresAt)>new Date())?"Actif":"Inactif";subExpires.textContent=s.expiresAt?"Expire le "+fmt(s.expiresAt):"Aucune date d'expiration";
- paymentsTable.innerHTML=data.payments.filter(p=>!isAgent||p.agentId===a?.id).length?data.payments.filter(p=>!isAgent||p.agentId===a?.id).map(p=>`<tr><td>${fmt(p.date)}</td><td>${esc(p.account)}</td><td>${money(p.amount)}</td><td><span class="badge green">${esc(p.status)}</span></td><td>${esc(p.reference)}</td></tr>`).join(""):`<tr><td colspan="5" class="empty">Aucun paiement.</td></tr>`;
+ const isAgent=mpRole()==="agent",a=getCurrentAgent(),s=isAgent?(a?.subscription||data.subscription||{status:"inactive",everSubscribed:false,expiresAt:null}):data.subscription||{status:"inactive",everSubscribed:false,expiresAt:null};
+ const first=!s.everSubscribed;
+ const price=isAgent?Number(s.price||(a?.merchantId?500:1000)):(first?1000:2000);
+ renderSubscriptionSummary("subscription",s,price,isAgent);
+ const rows=data.payments.filter(p=>!isAgent||p.agentId===a?.id);
+ paymentsTable.innerHTML=rows.length?rows.map(p=>{const ps=paymentStatusDisplay(p.status);return `<tr><td>${fmt(p.date)}</td><td>${esc(p.account)}</td><td>${money(p.amount)}</td><td><span class="badge ${ps[1]}">${esc(ps[0])}</span></td><td>${esc(p.reference)}</td></tr>`}).join(""):`<tr><td colspan="5" class="empty">Aucun paiement.</td></tr>`;
 }
 
 /* GLOBAL */
