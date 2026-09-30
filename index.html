@@ -179,8 +179,8 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:
 
 <section id="subscription" class="page">
 <div class="grid sections">
-<div class="subscription"><div class="muted" style="font-size:11px" id="subAccountLabel">ABONNEMENT MARCHAND</div><div style="font-size:28px;font-weight:900;margin:8px 0" id="subPrice">2 000 F / mois</div><div class="muted" id="subState">Actif</div><div class="muted" id="subExpires" style="margin-top:5px">Expire le —</div><button class="btn" style="margin-top:16px;background:#fff;color:#155eef" id="subPayBtn" onclick="startSubscription('merchant')">Se réabonner via FedaPay</button></div>
-<div class="card"><h2>Tarification</h2><div class="plan active"><h3>Marchand</h3><div class="plan-price">1 000 F</div><small>Premier abonnement d'un nouveau compte</small><div style="margin-top:9px;font-weight:700">Puis 2 000 F / mois</div></div><div class="plan" style="margin-top:12px"><h3>Agent rattaché</h3><div class="plan-price">500 F</div><small>Par agent et par mois, créé et géré par un marchand</small></div><div class="plan" style="margin-top:12px"><h3>Agent indépendant</h3><div class="plan-price">1 000 F</div><small>Compte autonome, sans merchant_id</small></div></div>
+<div class="subscription"><div class="muted" style="font-size:11px">ABONNEMENT MARCHAND</div><div style="font-size:28px;font-weight:900;margin:8px 0" id="subPrice">2 000 F / mois</div><div class="muted" id="subState">Actif</div><div class="muted" id="subExpires" style="margin-top:5px">Expire le —</div><button class="btn" style="margin-top:16px;background:#fff;color:#155eef" onclick="startSubscription('merchant')">Se réabonner via FedaPay</button></div>
+<div class="card"><h2>Tarification</h2><div class="plan active"><h3>Marchand</h3><div class="plan-price">1 000 F</div><small>Premier abonnement d'un nouveau compte</small><div style="margin-top:9px;font-weight:700">Puis 2 000 F / mois</div></div><div class="plan" style="margin-top:12px"><h3>Agent</h3><div class="plan-price">1 000 F</div><small>Par agent et par mois, séparément du marchand</small></div></div>
 </div>
 <div class="card" style="margin-top:15px"><h2>Historique des paiements</h2><div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Compte</th><th>Montant</th><th>Statut</th><th>Référence</th></tr></thead><tbody id="paymentsTable"></tbody></table></div></div>
 </section>
@@ -340,13 +340,7 @@ function ensureDayStart(){
 /* OPÉRATIONS */
 function getCurrentAgent(){
  const id=localStorage.getItem("moneypro_agent_id")||"";
- const linked=data.agents.find(a=>a.id===id);
- if(linked)return linked;
- if(mpRole()==="agent"&&data.profile&&data.profile.role==="agent"){
-   return {id:id||"self",name:data.profile.name,phone:data.profile.phone,email:data.profile.email,status:"active",merchantId:null,
-     subscription:data.subscription||{status:"inactive",everSubscribed:false,price:1000,expiresAt:null},profile:data.profile,wallets:data.wallets};
- }
- return null;
+ return data.agents.find(a=>a.id===id)||null;
 }
 function getOperationContext(){
  const role=mpRole();
@@ -553,12 +547,9 @@ function renderDashboard(){
  dashSubStatus.textContent=active?"Actif":"Expiré / inactif";dashSubDate.textContent=s.expiresAt?"Expire le "+fmt(s.expiresAt):"Aucun abonnement actif";
 }
 function renderSubscription(){
- const isAgent=mpRole()==="agent",a=getCurrentAgent(),s=isAgent?(a?.subscription||data.subscription||{status:"inactive",everSubscribed:false,price:1000,expiresAt:null}):data.subscription,first=!isAgent&&!s.everSubscribed,price=isAgent?(a?.merchantId?500:1000):(first?1000:2000);
- const label=document.getElementById("subAccountLabel"),pay=document.getElementById("subPayBtn");
- if(label)label.textContent=isAgent?(a?.merchantId?"ABONNEMENT AGENT RATTACHÉ":"ABONNEMENT AGENT INDÉPENDANT"):"ABONNEMENT MARCHAND";
- if(pay){pay.textContent="Payer / renouveler via FedaPay";pay.onclick=()=>startSubscription(isAgent?"agent":"merchant",isAgent?(a?.id||null):null)}
+ const isAgent=mpRole()==="agent",a=getCurrentAgent(),s=isAgent?(a?.subscription||data.subscription||{status:"inactive",everSubscribed:false,expiresAt:null}):data.subscription,first=isAgent?false:!s.everSubscribed,price=isAgent?(data.subscription?.price||500):(first?1000:2000);
  subPrice.textContent=money(price)+" / mois";subState.textContent=s.status==="active"&&(!s.expiresAt||new Date(s.expiresAt)>new Date())?"Actif":"Inactif";subExpires.textContent=s.expiresAt?"Expire le "+fmt(s.expiresAt):"Aucune date d'expiration";
- const rows=data.payments.filter(p=>!isAgent||p.agentId===a?.id); paymentsTable.innerHTML=rows.length?rows.map(p=>`<tr><td>${fmt(p.date)}</td><td>${esc(p.account)}</td><td>${money(p.amount)}</td><td><span class="badge green">${esc(p.status)}</span></td><td>${esc(p.reference)}</td></tr>`).join(""):`<tr><td colspan="5" class="empty">Aucun paiement.</td></tr>`;
+ paymentsTable.innerHTML=data.payments.filter(p=>!isAgent||p.agentId===a?.id).length?data.payments.filter(p=>!isAgent||p.agentId===a?.id).map(p=>`<tr><td>${fmt(p.date)}</td><td>${esc(p.account)}</td><td>${money(p.amount)}</td><td><span class="badge green">${esc(p.status)}</span></td><td>${esc(p.reference)}</td></tr>`).join(""):`<tr><td colspan="5" class="empty">Aucun paiement.</td></tr>`;
 }
 
 /* GLOBAL */
@@ -858,14 +849,14 @@ async function mpLoadFromSupabase(){
       fee:Number(o.commission||o.fee||0),
       client:o.client||"",
       note:o.note||"",
-      agent:owner?mpProfileName(owner):(me.role==="agent"?mpProfileName(me):merchantName),
-      agentId:owner?owner.id:(me.role==="agent"?u.id:null),
-      accountType:owner||me.role==="agent"?"agent":"merchant",
+      agent:owner?mpProfileName(owner):merchantName,
+      agentId:owner?owner.id:null,
+      accountType:owner?"agent":"merchant",
       createdBy:o.created_by,
       createdAt:o.created_at,
       date:o.operation_date||o.created_at
     };
-  }).filter(o=>me.role==="merchant"||o.accountType==="agent"&&o.agentId===u.id);
+  }).filter(o=>me.role==="merchant"||o.agentId===u.id);
 
   data.expenses=(expR.data||[]).map(x=>{
     const ownerId=x.owner_id||x.profile_id;
@@ -905,8 +896,8 @@ async function mpLoadFromSupabase(){
     return {
       id:x.id,
       date:x.created_at,
-      account:owner?mpProfileName(owner):(me.role==="agent"?mpProfileName(me):merchantName),
-      agentId:owner?owner.id:(me.role==="agent"?u.id:null),
+      account:owner?mpProfileName(owner):merchantName,
+      agentId:owner?owner.id:null,
       amount:Number(x.amount||0),
       status:x.status||"pending",
       reference:x.reference||x.provider_transaction_id||"—"
@@ -1201,9 +1192,9 @@ if(mpSupabase){
   startSubscription=async function(kind,agentId=null){
     try{
       const isAgent=kind==="agent";
-      const accountId=isAgent?(agentId||await mpUserId()):await mpUserId();
+      const accountId=isAgent?agentId:await mpUserId();
       if(!accountId)return;
-      const account=(isAgent?(agentId?data.agents.find(a=>a.id===agentId):getCurrentAgent()):data.profile)||{};
+      const account=(isAgent?data.agents.find(a=>a.id===agentId):data.profile)||{};
       const first=!isAgent && !data.subscription.everSubscribed;
       const amount=isAgent?(account.merchantId?500:1000):(first?1000:2000);
       openModal("Paiement sécurisé FedaPay",`<div class="plan active"><h3>${isAgent?"Abonnement agent":"Abonnement marchand"}</h3><div class="plan-price">${money(amount)} / mois</div><small>${isAgent?"Agent : "+esc(account.name||""):(first?"Premier abonnement":"Renouvellement")}</small></div><div class="notice" style="margin-top:13px">Vous allez être redirigé vers la page de paiement sécurisée FedaPay. L’abonnement ne sera activé qu’après confirmation serveur.</div><div class="actions"><button class="btn gray" onclick="closeModal()">Annuler</button><button class="btn" id="fedapayContinue">Continuer vers FedaPay</button></div>`);
