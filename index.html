@@ -65,8 +65,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:
       <button class="btn" style="width:100%">Enregistrer le nouveau mot de passe</button>
     </form>
     <div id="authMsg" class="msg"></div>
-    <div class="footer-note">Mode de démonstration local disponible avant la création de Supabase.</div>
-    <button class="btn secondary" style="width:100%;margin-top:14px" onclick="demoLogin()">Tester l'application en mode démo</button>
+    
   </div>
 </div>
 
@@ -91,7 +90,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:
 
 <main class="main">
 <div class="top">
-  <div class="top-left"><button class="mobile-menu" onclick="toggleSidebar()">☰</button><div><h1 id="pageTitle">Tableau de bord</h1><div class="status"><span class="dot"></span><span id="connectionText">Mode local — synchronisation à venir</span></div></div></div>
+  <div class="top-left"><button class="mobile-menu" onclick="toggleSidebar()">☰</button><div><h1 id="pageTitle">Tableau de bord</h1><div class="status"><span class="dot"></span><span id="connectionText">Supabase — connexion sécurisée</span></div></div></div>
   <button id="newOperationBtn" class="btn" onclick="openOperation()">+ Nouvelle opération</button>
 </div>
 
@@ -295,7 +294,6 @@ document.getElementById("loginForm").onsubmit=e=>{
  msg("Compte introuvable ou identifiants incorrects.");
 };
 document.getElementById("forgotForm").onsubmit=e=>{e.preventDefault();msg("En mode local, aucune adresse n'est réellement envoyée. Avec Supabase, un lien sécurisé sera envoyé automatiquement.",true)};
-function demoLogin(){switchToMerchant();localStorage.setItem("moneypro_session","1");showApp()}
 function showApp(){restoreSessionAccount();document.getElementById("authScreen").classList.add("hidden");document.getElementById("app").classList.remove("hidden");loadSettings();renderAll();configureAgentView();populateMerchantAgentSelector()}
 function logout(){persistCurrentAccount();switchToMerchant();localStorage.removeItem("moneypro_session");document.getElementById("app").classList.add("hidden");document.getElementById("authScreen").classList.remove("hidden");authView("login")}
 function resetAll(){if(confirm("Effacer toutes les données locales ?")){localStorage.removeItem(STORAGE);location.reload()}}
@@ -681,6 +679,12 @@ let mpDbReady = false;
 if(window.supabase && MP_SUPABASE_CONFIGURED){
   mpSupabase = window.supabase.createClient(MP_SUPABASE_URL, MP_SUPABASE_ANON_KEY, {
     auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
+  });
+} else {
+  console.error("MoneyPro: bibliothèque Supabase ou configuration Supabase indisponible.");
+  window.addEventListener("DOMContentLoaded",()=>{
+    const box=document.getElementById("authMsg");
+    if(box) box.innerHTML="<span class=\"error\">Connexion Supabase indisponible. Rechargez la page ou vérifiez le chargement de Supabase.</span>";
   });
 }
 function mpDbError(error){ console.error("MoneyPro/Supabase:",error); return error?.message || "Erreur Supabase."; }
