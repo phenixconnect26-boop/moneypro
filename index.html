@@ -1199,17 +1199,27 @@ if(mpSupabase){
       const amount=isAgent?(account.merchantId?500:1000):(first?1000:2000);
       openModal("Paiement sécurisé FedaPay",`<div class="plan active"><h3>${isAgent?"Abonnement agent":"Abonnement marchand"}</h3><div class="plan-price">${money(amount)} / mois</div><small>${isAgent?"Agent : "+esc(account.name||""):(first?"Premier abonnement":"Renouvellement")}</small></div><div class="notice" style="margin-top:13px">Vous allez être redirigé vers la page de paiement sécurisée FedaPay. L’abonnement ne sera activé qu’après confirmation serveur.</div><div class="actions"><button class="btn gray" onclick="closeModal()">Annuler</button><button class="btn" id="fedapayContinue">Continuer vers FedaPay</button></div>`);
       document.getElementById("fedapayContinue").onclick=async()=>{
-        const {data:sessionData}=await mpSupabase.auth.getSession();
-        const token=sessionData?.session?.access_token;
-        if(!token)throw new Error("Session Supabase absente.");
-        const r=await fetch(MP_SUPABASE_URL+"/functions/v1/fedapay-create-payment",{
-          method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},
-          body:JSON.stringify({account_id:accountId,account_type:isAgent?"agent":"merchant",callback_url:location.origin+location.pathname+"?fedapay_return=1"})
-        });
-        const j=await r.json().catch(()=>({}));
-        if(!r.ok)throw new Error(j.error||"Impossible de créer le paiement FedaPay.");
-        if(!j.payment_url)throw new Error("FedaPay n’a pas fourni de lien de paiement.");
-        window.location.href=j.payment_url;
+        const btn=document.getElementById("fedapayContinue");
+        try{
+          if(btn){btn.disabled=true;btn.textContent="Connexion à FedaPay…";}
+          const {data:sessionData,error:sessionError}=await mpSupabase.auth.getSession();
+          if(sessionError)throw sessionError;
+          const token=sessionData?.session?.access_token;
+          if(!token)throw new Error("Session Supabase absente. Reconnectez-vous puis réessayez.");
+          const r=await fetch(MP_SUPABASE_URL+"/functions/v1/fedapay-create-payment",{
+            method:"POST",
+            headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},
+            body:JSON.stringify({account_id:accountId,account_type:isAgent?"agent":"merchant",callback_url:location.origin+location.pathname+"?fedapay_return=1"})
+          });
+          const j=await r.json().catch(()=>({}));
+          if(!r.ok)throw new Error(j.error||`Erreur FedaPay (${r.status})`);
+          if(!j.payment_url)throw new Error("FedaPay n’a pas fourni de lien de paiement.");
+          window.location.href=j.payment_url;
+        }catch(e){
+          console.error("MoneyPro FedaPay:",e);
+          alert(e?.message||String(e)||"Impossible de démarrer le paiement FedaPay.");
+          if(btn){btn.disabled=false;btn.textContent="Continuer vers FedaPay";}
+        }
       };
     }catch(e){alert(mpDbError(e));}
   };
