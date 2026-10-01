@@ -215,42 +215,41 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:
  - Le statut d'abonnement sera calculé côté serveur.
 */
 
-const STORAGE="moneypro_complete_v2";
-
-const initialData={
- profile:{
-  role:"merchant",shopName:"Ma boutique Mobile Money",name:"",
-  phone:"",email:""
- },
- wallets:[
-  {id:"mtn",name:"MTN",balance:0},
-  {id:"moov",name:"Moov",balance:0},
-  {id:"celtiis",name:"Celtiis",balance:0},
-  {id:"cash",name:"Espèces",balance:0}
- ],
- operations:[],
- expenses:[],
- products:[],
- agents:[],
- payments:[],
- subscription:{
-  status:"active",
-  everSubscribed:false,
-  price:1000,
-  startedAt:null,
-  expiresAt:null
- }
+/* État applicatif : Supabase est la source de vérité en ligne.
+   Une copie locale est conservée uniquement comme dernier état connu pour le mode hors connexion. */
+let data={
+  profile:null, merchantProfile:null, merchantWallets:[], wallets:[],
+  operations:[], expenses:[], products:[], agents:[], payments:[],
+  commissionTransfers:[], dayHistory:[], subscription:null, merchantId:null
 };
-
-let data=load();
-// Migration des données v5 vers la séparation marchand/agents.
-if(!data.merchantProfile)data.merchantProfile=clone(data.profile||initialData.profile);
-if(!data.merchantWallets)data.merchantWallets=clone(data.wallets||initialData.wallets);
-if(!Array.isArray(data.agents))data.agents=[];
-data.agents.forEach(a=>{a.wallets=a.wallets||clone(initialData.wallets);a.profile=a.profile||{role:"agent",account_type:"agent_attached",merchant_id:null,name:a.name,shopName:data.merchantProfile.shopName,phone:a.phone,email:a.email,merchantContactPhone:data.merchantProfile.phone||"",dayStarted:false,openingDate:null};a.status=a.status||"active";a.subscription=a.subscription||{status:"inactive",expiresAt:null,everSubscribed:false,price:1000};});
-function clone(o){return JSON.parse(JSON.stringify(o))}
-function load(){try{return JSON.parse(localStorage.getItem(STORAGE))||clone(initialData)}catch(e){return clone(initialData)}}
-function save(){localStorage.setItem(STORAGE,JSON.stringify(data));renderAll()}
+const MP_LOCAL_CACHE_PREFIX="moneypro_last_sync_v1_";
+function clone(o){return o==null?o:JSON.parse(JSON.stringify(o))}
+function load(){return data}
+function save(){
+  /* Les écritures métier restent sur Supabase. Le cache local ne sert qu'au mode hors connexion. */
+  renderAll();
+}
+function mpCacheKey(userId){return MP_LOCAL_CACHE_PREFIX+String(userId||"")}
+function saveLocalCache(userId){
+  if(!userId || !data.profile)return;
+  try{
+    localStorage.setItem(mpCacheKey(userId),JSON.stringify({savedAt:new Date().toISOString(),data:clone(data)}));
+  }catch(e){console.warn("MoneyPro cache local:",e);}
+}
+function loadLocalCache(userId){
+  if(!userId)return false;
+  try{
+    const raw=localStorage.getItem(mpCacheKey(userId));
+    if(!raw)return false;
+    const parsed=JSON.parse(raw);
+    if(!parsed?.data?.profile)return false;
+    data=parsed.data;
+    return true;
+  }catch(e){
+    console.warn("MoneyPro cache local:",e);
+    return false;
+  }
+}
 function money(n){return new Intl.NumberFormat("fr-FR").format(Math.round(Number(n)||0))+" F"}
 function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
 function isoNow(){return new Date().toISOString()}
@@ -275,36 +274,45 @@ function authView(v){
  document.getElementById("authSubtitle").textContent=v==="forgot"?"Recevez un lien sécurisé de réinitialisation.":v==="reset"?"Finalisez la réinitialisation de votre mot de passe.":"Gérez vos opérations Mobile Money, votre caisse et votre stock.";
  msg("");
 }
-document.getElementById("signupForm").onsubmit=e=>{
- e.preventDefault();
- let p1=suPass.value,p2=suPass2.value;
- if(p1!==p2)return msg("Les deux mots de passe sont différents.");
- data.profile={role:"merchant",shopName:suShop.value.trim(),name:suName.value.trim(),phone:suPhone.value.trim(),email:suEmail.value.trim(),merchantContactPhone:"",dayStarted:false,openingDate:null};
- data.subscription={status:"inactive",everSubscribed:false,price:1000,startedAt:null,expiresAt:null};
- data.merchantProfile=clone(data.profile);data.merchantWallets=clone(data.wallets);
- localStorage.setItem(STORAGE,JSON.stringify(data));
- localStorage.setItem("moneypro_session","1");
- msg("Compte créé. Vérifiez votre adresse email avant de vous connecter.",true);
- setTimeout(showApp,500);
-};
-document.getElementById("loginForm").onsubmit=e=>{
- e.preventDefault();
- const email=String(liEmail.value||"").trim().toLowerCase(), pass=String(liPass.value||"");
- if(!localStorage.getItem(STORAGE))return msg("Aucun compte local. Utilisez l'inscription.");
- if(email===String(data.profile.email||"").trim().toLowerCase()){
-   localStorage.setItem("moneypro_session","1"); showApp(); return;
- }
- const a=data.agents.find(x=>String(x.email||"").trim().toLowerCase()===email);
- if(a){
-   if(pass!==String(a.password||""))return msg("Identifiants agent incorrects.");
-   localStorage.setItem("moneypro_session","1"); showApp(); return;
- }
- msg("Compte introuvable ou identifiants incorrects.");
-};
-document.getElementById("forgotForm").onsubmit=e=>{e.preventDefault();msg("Un lien sécurisé de réinitialisation vous sera envoyé automatiquement.",true)};
-function showApp(){document.getElementById("authScreen").classList.add("hidden");document.getElementById("app").classList.remove("hidden");document.body.classList.remove("booting");loadSettings();renderAll();configureAgentView();populateMerchantAgentSelector()}
-function logout(){localStorage.removeItem("moneypro_session");document.getElementById("app").classList.add("hidden");document.getElementById("authScreen").classList.remove("hidden");document.body.classList.remove("booting");authView("login")}
-function resetAll(){if(confirm("Effacer toutes les données locales ?")){localStorage.removeItem(STORAGE);location.reload()}}
+/* AUTHENTIFICATION : les comptes et identifiants sont gérés exclusivement par Supabase. */
+function showApp(){
+  if(!mpDbReady && navigator.onLine){
+    document.getElementById("app").classList.add("hidden");
+    document.getElementById("authScreen").classList.remove("hidden");
+    authView("login");
+    document.body.classList.remove("booting");
+    msg("Impossible de charger les données Supabase.");
+    return;
+  }
+  if(!mpDbReady && !data.profile){
+    document.getElementById("app").classList.add("hidden");
+    document.getElementById("authScreen").classList.remove("hidden");
+    authView("login");
+    document.body.classList.remove("booting");
+    msg("Aucune donnée locale disponible. Connectez-vous une première fois avec Internet.");
+    return;
+  }
+  document.getElementById("authScreen").classList.add("hidden");
+  document.getElementById("app").classList.remove("hidden");
+  document.body.classList.remove("booting");
+  loadSettings();
+  renderAll();
+  configureAgentView();
+  populateMerchantAgentSelector();
+}async function logout(){
+  try{ if(typeof mpSupabase!=="undefined" && mpSupabase) await mpSupabase.auth.signOut(); }
+  catch(e){ console.error(e); }
+}
+function resetAll(){
+  alert("Les données MoneyPro sont stockées dans Supabase. Utilisez les fonctions d’administration Supabase pour supprimer des données.");
+}
+function clearRuntimeData(){
+  data={
+    profile:null, merchantProfile:null, merchantWallets:[], wallets:[],
+    operations:[], expenses:[], products:[], agents:[], payments:[],
+    commissionTransfers:[], dayHistory:[], subscription:null, merchantId:null
+  };
+}
 
 /* NAV */
 const titles={dashboard:"Tableau de bord",operations:"Opérations",wallets:"Portefeuilles",expenses:"Dépenses",inventory:"Inventaire",agents:"Agents",reports:"Rapports",subscription:"Abonnement",settings:"Paramètres"};
@@ -722,7 +730,17 @@ function mpWalletsFromRows(rows){
 function mpProfileName(p){return p.full_name||p.name||"Marchand";}
 
 async function mpLoadFromSupabase(){
-  if(!mpSupabase)return false;
+  /* Quand le réseau est disponible, Supabase est l'unique source des données métier. */
+  if(!mpSupabase || !navigator.onLine){
+    mpDbReady=false;
+    return false;
+  }
+  /* Ne jamais conserver des données métier provenant d'une ancienne session en mémoire. */
+  data={
+    profile:null, merchantProfile:null, merchantWallets:[], wallets:[],
+    operations:[], expenses:[], products:[], agents:[], payments:[],
+    commissionTransfers:[], dayHistory:[], subscription:null, merchantId:null
+  };
   const u=await mpUser(); if(!u)return false;
   const me=await mpProfile(u.id);
   const merchantId=me.role==="merchant"?me.id:(me.merchant_id||null);
@@ -914,6 +932,7 @@ async function mpLoadFromSupabase(){
 
   data.merchantId=merchantId;
   mpDbReady=true;
+  saveLocalCache(u.id);
   return true;
 }
 
@@ -1071,8 +1090,26 @@ async function mpLoginByPhone(phone,password){
   const {error}=await mpSupabase.auth.setSession({access_token:j.access_token,refresh_token:j.refresh_token});
   if(error)throw error;
 }
-async function mpRefresh(){await mpLoadFromSupabase();showApp();}
-/* AUTH SUPABASE */
+async function mpRefresh(){
+  try{
+    const sessionResult=await mpSupabase.auth.getSession();
+    const u=sessionResult?.data?.session?.user;
+    if(!u)return;
+    if(navigator.onLine){
+      await mpLoadFromSupabase();
+      showApp();
+    }else if(loadLocalCache(u.id)){
+      mpDbReady=false;
+      showApp();
+    }else{
+      showApp();
+    }
+  }catch(e){
+    mpDbReady=false;
+    console.error(e);
+    showApp();
+  }
+}/* AUTH SUPABASE */
 if(mpSupabase){
   document.getElementById("signupForm").onsubmit=async e=>{
     e.preventDefault();
@@ -1208,7 +1245,6 @@ if(mpSupabase){
   const _oldLogout=logout;
   logout=async function(){
     try{await mpSupabase.auth.signOut();}catch(e){console.error(e)}
-    localStorage.removeItem("moneypro_session");
   };
   /* Opérations: le solde et l'écriture sont gérés atomiquement par PostgreSQL. */
   openOperation=async function(){
@@ -1278,7 +1314,79 @@ if(mpSupabase){
     }
   });
 
-  document.addEventListener("DOMContentLoaded",async()=>{try{const u=await mpUser();if(u){await mpLoadFromSupabase();showApp();}else{document.getElementById("app").classList.add("hidden");document.getElementById("authScreen").classList.remove("hidden");authView("login");document.body.classList.remove("booting");}}catch(e){console.error(e);document.getElementById("app").classList.add("hidden");document.getElementById("authScreen").classList.remove("hidden");authView("login");document.body.classList.remove("booting");}});
+  document.addEventListener("DOMContentLoaded",async()=>{
+  try{
+    const sessionResult=await mpSupabase.auth.getSession();
+    const session=sessionResult?.data?.session;
+    const u=session?.user;
+    if(!u){
+      mpDbReady=false;
+      clearRuntimeData();
+      document.getElementById("app").classList.add("hidden");
+      document.getElementById("authScreen").classList.remove("hidden");
+      authView("login");
+      document.body.classList.remove("booting");
+      return;
+    }
+    if(navigator.onLine){
+      await mpLoadFromSupabase();
+      showApp();
+    }else if(loadLocalCache(u.id)){
+      mpDbReady=false;
+      showApp();
+    }else{
+      mpDbReady=false;
+      showApp();
+    }
+  }catch(e){
+    mpDbReady=false;
+    console.error(e);
+    const session=await mpSupabase.auth.getSession().catch(()=>null);
+    const u=session?.data?.session?.user;
+    if(u && loadLocalCache(u.id))showApp();
+    else{
+      clearRuntimeData();
+      document.getElementById("app").classList.add("hidden");
+      document.getElementById("authScreen").classList.remove("hidden");
+      authView("login");
+      document.body.classList.remove("booting");
+    }
+  }
+});
+
+/* Hors connexion : conserver la dernière synchronisation locale au lieu de vider l'application. */
+window.addEventListener("offline",async()=>{
+  mpDbReady=false;
+  try{
+    const session=await mpSupabase.auth.getSession();
+    const u=session?.data?.session?.user;
+    if(u && loadLocalCache(u.id)){
+      showApp();
+      const c=document.getElementById("connectionText");
+      if(c)c.textContent="Hors connexion — dernières données synchronisées";
+    }else{
+      showApp();
+    }
+  }catch(e){
+    console.error(e);
+    showApp();
+  }
+});
+
+/* Connexion retrouvée : Supabase reprend immédiatement la priorité et remplace le cache local. */
+window.addEventListener("online",async()=>{
+  try{
+    await mpLoadFromSupabase();
+    showApp();
+  }catch(e){
+    mpDbReady=false;
+    console.error(e);
+    const c=document.getElementById("connectionText");
+    if(c)c.textContent="Hors connexion — dernières données synchronisées";
+    const u=(await mpSupabase.auth.getSession().catch(()=>null))?.data?.session?.user;
+    if(u && loadLocalCache(u.id))showApp();
+  }
+});
 }
 </script>
 </body>
