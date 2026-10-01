@@ -4,14 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b1020">
-<title>MoneyPro V8 — Gestion Mobile Money</title>
+<title>MoneyPro V1.2 — Gestion Mobile Money</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{--bg:#f4f6fa;--card:#fff;--ink:#101828;--muted:#667085;--line:#e4e7ec;--blue:#155eef;--blue2:#0b4acb;--green:#12b76a;--red:#f04438;--orange:#f79009;--nav:#0b1020;--shadow:0 10px 30px #10182812}
 *{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink)}
 button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:none!important}.booting #authScreen,.booting #app{display:none!important}
 .auth{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(135deg,#07111f,#12346b)}
-.auth-card{width:min(470px,100%);background:#fff;border-radius:22px;padding:28px;box-shadow:0 25px 70px #0005}.logo{font-size:25px;font-weight:900}.logo span{color:#155eef}.auth-card h1{font-size:25px;margin:24px 0 7px}.auth-card>p{font-size:13px;color:var(--muted);margin:0 0 20px}.tabs{display:flex;background:#f2f4f7;padding:4px;border-radius:11px;margin-bottom:18px}.tabs button{flex:1;min-width:0;border:0;background:transparent;border-radius:8px;padding:10px}.tabs button.active{background:#fff;box-shadow:0 1px 5px #0001;font-weight:700}.field{display:flex;flex-direction:column;gap:6px;margin-bottom:13px}.field label{font-size:12px;font-weight:700;color:#344054}.field input,.field select,.field textarea{width:100%;padding:11px 12px;border:1px solid #d0d5dd;border-radius:10px;background:#fff;outline:0}.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px #155eef14}.btn{border:0;border-radius:10px;background:var(--blue);color:#fff;padding:11px 15px;font-weight:750}.btn:hover{background:var(--blue2)}.btn.secondary{background:#eef4ff;color:var(--blue)}.btn.gray{background:#f2f4f7;color:#344054}.btn.danger{background:#fff0ef;color:#b42318}.btn.small{padding:8px 10px;font-size:12px}.auth-actions{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:4px}.link{border:0;background:none;color:var(--blue);padding:0;font-size:12px}.msg{font-size:12px;margin-top:10px}.success{color:#087443}.error{color:#b42318}
+.auth-card{width:min(470px,100%);background:#fff;border-radius:22px;padding:28px;box-shadow:0 25px 70px #0005}
+.session-recovery{display:none;text-align:center;padding:25px 8px}.session-recovery strong{display:block;font-size:18px;margin-bottom:8px}.session-recovery span{font-size:13px;color:var(--muted)}.logo{font-size:25px;font-weight:900}.logo span{color:#155eef}.auth-card h1{font-size:25px;margin:24px 0 7px}.auth-card>p{font-size:13px;color:var(--muted);margin:0 0 20px}.tabs{display:flex;background:#f2f4f7;padding:4px;border-radius:11px;margin-bottom:18px}.tabs button{flex:1;min-width:0;border:0;background:transparent;border-radius:8px;padding:10px}.tabs button.active{background:#fff;box-shadow:0 1px 5px #0001;font-weight:700}.field{display:flex;flex-direction:column;gap:6px;margin-bottom:13px}.field label{font-size:12px;font-weight:700;color:#344054}.field input,.field select,.field textarea{width:100%;padding:11px 12px;border:1px solid #d0d5dd;border-radius:10px;background:#fff;outline:0}.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px #155eef14}.btn{border:0;border-radius:10px;background:var(--blue);color:#fff;padding:11px 15px;font-weight:750}.btn:hover{background:var(--blue2)}.btn.secondary{background:#eef4ff;color:var(--blue)}.btn.gray{background:#f2f4f7;color:#344054}.btn.danger{background:#fff0ef;color:#b42318}.btn.small{padding:8px 10px;font-size:12px}.auth-actions{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:4px}.link{border:0;background:none;color:var(--blue);padding:0;font-size:12px}.msg{font-size:12px;margin-top:10px}.success{color:#087443}.error{color:#b42318}
 .app{min-height:100vh;display:flex}.sidebar{position:fixed;left:0;top:0;bottom:0;width:245px;background:var(--nav);color:#fff;padding:20px 14px;z-index:30}.brand{font-size:21px;font-weight:900;padding:6px 10px 20px}.brand span{color:#66a3ff}.user-mini{background:#151e35;border-radius:12px;padding:11px;margin-bottom:13px;font-size:12px}.user-mini b{display:block;margin-bottom:4px}.nav button{display:flex;width:100%;border:0;background:transparent;color:#cbd5e1;padding:11px 12px;border-radius:10px;margin:3px 0;text-align:left;gap:10px}.nav button.active,.nav button:hover{background:#17213b;color:#fff}.side-bottom{position:absolute;left:14px;right:14px;bottom:18px}.main{margin-left:245px;width:calc(100% - 245px);padding:22px;max-width:1650px}.top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px}.top-left{display:flex;align-items:center;gap:10px}.top h1{margin:0;font-size:25px}.status{font-size:11px;color:var(--muted);margin-top:3px}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:5px}.mobile-menu{display:none;border:1px solid var(--line);background:#fff;border-radius:9px;padding:8px}
 .page{display:none}.page.active{display:block}.grid{display:grid;gap:15px}.cards{grid-template-columns:repeat(2,1fr)}.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:17px;box-shadow:var(--shadow)}.metric{font-size:11px;color:var(--muted)}.value{font-size:25px;font-weight:850;margin:7px 0}.sub{font-size:11px;color:var(--muted)}.positive{color:var(--green)}.negative{color:var(--red)}.sections{grid-template-columns:1.4fr 1fr;margin-top:15px}.section-title{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px}.section-title h2,.card h2{font-size:17px;margin:0}.table-wrap{overflow:auto}.table{width:100%;border-collapse:collapse;font-size:12px}.table th,.table td{padding:11px 7px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}.table th{font-size:10px;color:var(--muted);text-transform:uppercase}.badge{display:inline-flex;align-items:center;padding:4px 7px;border-radius:999px;background:#eef4ff;color:var(--blue);font-size:10px;font-weight:750}.badge.green{background:#ecfdf3;color:#087443}.badge.red{background:#fff0ef;color:#b42318}.badge.orange{background:#fff7e8;color:#b54708}.wallets{grid-template-columns:repeat(2,minmax(0,1fr))}.list-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.movement-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 18px}.wallet{border:1px solid var(--line);border-radius:14px;padding:15px}.wallet strong{font-size:13px}.wallet .amount{font-size:21px;font-weight:850;margin-top:8px}.toolbar{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:14px}.toolbar input,.toolbar select{padding:9px 10px;border:1px solid var(--line);border-radius:9px;background:#fff}.form-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:13px}.full{grid-column:1/-1}.actions{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}.notice{padding:13px;border-radius:12px;background:#eef4ff;color:#194185;font-size:12px}.warning{background:#fff7e8;color:#8a4b08}.empty{text-align:center;padding:28px;color:var(--muted)}.modal{position:fixed;inset:0;background:#10182899;display:none;align-items:center;justify-content:center;padding:18px;z-index:80}.modal.open{display:flex}.modal-box{background:#fff;width:min(650px,100%);max-height:93vh;overflow:auto;border-radius:18px;padding:20px}.modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}.modal-head h3{margin:0}.close{width:33px;height:33px;border:0;background:#f2f4f7;border-radius:50%}.plan{border:1px solid var(--line);border-radius:15px;padding:17px}.plan.active{border:2px solid var(--blue)}.pricing-plan{display:none}.plan h3{margin:0 0 6px}.plan-price{font-size:23px;font-weight:850}.plan small{color:var(--muted)}.stat-row{display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding:10px 0;font-size:13px}.kpi{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.report-stat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:15px}.report-stat-card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px}.report-stat-card h3{font-size:14px;margin:0 0 10px}.report-op-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.report-op-item{border:1px solid var(--line);border-radius:10px;padding:10px;text-align:center}.report-op-item span{display:block;font-size:10px;color:var(--muted);margin-bottom:4px}.report-op-item b{font-size:20px}.subscription{border-radius:16px;background:linear-gradient(135deg,#0b1020,#17376d);color:#fff;padding:20px}.subscription .muted{color:#cbd5e1}.footer-note{text-align:center;color:var(--muted);font-size:10px;margin-top:18px}
 @media(max-width:1050px){.cards{grid-template-columns:repeat(2,1fr)}.wallets{grid-template-columns:repeat(2,minmax(0,1fr))}.list-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.movement-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.sections{grid-template-columns:1fr}.sidebar{width:215px}.main{margin-left:215px;width:calc(100% - 215px)}}
@@ -26,9 +27,11 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:
 <!-- AUTHENTIFICATION -->
 <div id="authScreen" class="auth">
   <div class="auth-card">
-    <div class="logo">Money<span>Pro</span></div>
+    <div class="logo">Money<span>Pro</span> <small style="font-size:13px;color:#667085;font-weight:800">V1.2</small></div>
     <h1 id="authTitle">Créer votre compte</h1>
     <p id="authSubtitle">Gérez vos opérations Mobile Money, votre caisse et votre stock.</p>
+
+    <div id="sessionRecovery" class="session-recovery"><strong>Restauration de votre session…</strong><span id="sessionRecoveryText">Connexion sécurisée en cours. Vos identifiants ne seront pas redemandés.</span></div>
 
     <div class="tabs">
       <button id="tabSignup" class="active" onclick="authView('signup')">Marchand</button>
@@ -82,7 +85,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:
 <!-- APPLICATION -->
 <div id="app" class="app hidden">
 <aside id="sidebar" class="sidebar">
-  <div class="brand">Money<span>Pro</span></div>
+  <div class="brand">Money<span>Pro</span> <small style="font-size:11px;color:#9dbfff;font-weight:800">V1.2</small></div>
   <div class="user-mini"><b id="sideName">Marchand</b><span id="sideRole">Marchand</span></div>
   <nav class="nav">
     <button data-page="dashboard" class="active">📊 Tableau de bord</button>
@@ -204,7 +207,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:
 
 <script>
 /*
- MONEYPRO — ARCHITECTURE PRÊTE POUR FEDAPAY
+ MONEYPRO V1.2 — ARCHITECTURE PRÊTE POUR FEDAPAY
 
  La connexion sécurisée est activée.
  Quand le projet sera créé :
@@ -308,7 +311,16 @@ function resetAll(){if(confirm("Effacer toutes les données locales ?")){localSt
 
 /* NAV */
 const titles={dashboard:"Tableau de bord",operations:"Opérations",wallets:"Portefeuilles",expenses:"Dépenses",inventory:"Inventaire",agents:"Agents",reports:"Rapports",subscription:"Abonnement",settings:"Paramètres"};
-function showPage(id){document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));document.getElementById(id).classList.add("active");document.querySelectorAll(".nav button").forEach(x=>x.classList.toggle("active",x.dataset.page===id));document.getElementById("pageTitle").textContent=titles[id];document.getElementById("sidebar").classList.remove("open")}
+function showPage(id){
+  // La gestion des agents est réservée au marchand. Un agent indépendant
+  // ne doit ni voir le menu Agents, ni pouvoir ouvrir cette page directement.
+  if(id==="agents" && !isMerchantRole()) id="dashboard";
+  document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));
+  const page=document.getElementById(id); if(page) page.classList.add("active");
+  document.querySelectorAll(".nav button").forEach(x=>x.classList.toggle("active",x.dataset.page===id));
+  document.getElementById("pageTitle").textContent=titles[id]||"";
+  document.getElementById("sidebar").classList.remove("open")
+}
 document.querySelectorAll(".nav button").forEach(b=>b.onclick=()=>showPage(b.dataset.page));
 function toggleSidebar(){document.getElementById("sidebar").classList.toggle("open")}
 function openModal(t,b){modalTitle.textContent=t;modalBody.innerHTML=b;modal.classList.add("open")}
@@ -473,6 +485,7 @@ function deleteProduct(id){if(confirm("Supprimer ?")){data.products=data.product
 function generateTempPassword(){return Math.random().toString(36).slice(2,6).toUpperCase()+Math.floor(1000+Math.random()*9000)}
 function newAgentWallets(){return [{id:"mtn",name:"MTN",balance:0},{id:"moov",name:"Moov",balance:0},{id:"celtiis",name:"Celtiis",balance:0},{id:"cash",name:"Espèces",balance:0}]}
 function openAgent(){
+ if(!isMerchantRole()){ alert("La gestion des agents est réservée au marchand."); return; }
  openModal("Créer un agent",`<form id="agentForm" class="form-grid"><div class="notice full">L’agent aura son propre compte, ses propres soldes et son propre abonnement de <b>500 F CFA/mois</b>. Son abonnement ne modifie jamais celui du marchand.</div><div class="field"><label>Nom complet</label><input name="name" required></div><div class="field"><label>Téléphone</label><input name="phone" required></div><div class="field"><label>Email de connexion</label><input name="email" type="email" required></div><div class="full"><small style="color:var(--muted)">Un mot de passe temporaire sera généré et affiché une seule fois après création.</small></div><div class="actions full"><button type="button" class="btn gray" onclick="closeModal()">Annuler</button><button class="btn">Créer l’agent</button></div></form>`);
  document.getElementById("agentForm").onsubmit=e=>{
   e.preventDefault();let f=new FormData(e.target),email=String(f.get("email")||"").trim().toLowerCase();
@@ -482,15 +495,21 @@ function openAgent(){
  };
 }
 function renderAgents(){
+ if(!isMerchantRole()){ if(agentsTable) agentsTable.innerHTML=""; return; }
  agentsTable.innerHTML=data.agents.length?data.agents.map(a=>{
    const sv=subscriptionDisplay(a.subscription||{});
    const subText=sv.key==="trial"?sv.date:(sv.key==="active"?sv.date:"Expiré");
    return `<tr><td><b>${esc(a.name)}</b><br><small>${esc(a.email)}</small></td><td>${esc(a.phone)}</td><td><span class="role-pill">Agent rattaché</span></td><td>${a.status!=="inactive"?'<span class="badge green">Actif</span>':'<span class="badge red">Désactivé</span>'}</td><td><span class="badge ${sv.badge}">${esc(subText)}</span></td><td><button class="btn secondary small" onclick="startSubscription('agent','${a.id}')">Abonnement</button> <button class="btn danger small" onclick="deactivateAgent('${a.id}')">Désactiver</button></td></tr>`;
  }).join(""):`<tr><td colspan="6" class="empty">Aucun agent rattaché.</td></tr>`;
 }
-function deactivateAgent(id){const a=data.agents.find(x=>x.id===id);if(!a)return;if(confirm("Désactiver cet agent ? Son historique sera conservé.")){a.status="inactive";save()}}
+function deactivateAgent(id){
+ if(!isMerchantRole()){alert("La gestion des agents est réservée au marchand.");return;}
+ const a=data.agents.find(x=>x.id===id);if(!a)return;
+ if(confirm("Désactiver cet agent ? Son historique sera conservé.")){a.status="inactive";save()}
+}
 /* SUBSCRIPTIONS — LOCAL SIMULATION, SERA REMPLACÉE PAR SUPABASE + FEDAPAY */
 function startSubscription(kind,agentId=null){
+ if(kind==="agent" && !isMerchantRole()){ alert("Seul le marchand peut gérer l'abonnement d'un agent rattaché."); return; }
  let isAgent=kind==="agent",agent=isAgent?data.agents.find(a=>a.id===agentId):null;
  if(isAgent&&!agent)return;
  let first=isAgent?!agent.subscription.everSubscribed:!data.subscription.everSubscribed;
@@ -707,12 +726,22 @@ function applyAgentOperationLock(){
 }
 function configureAgentView(){
   const role=mpRole();
+  const accountType=mpAccountType();
   const isAgent=isAgentRole(role);
-  const isIndependent=role === "agent_independent";
-  document.querySelectorAll('button[data-page="agents"], #agents, #agentAccessRules').forEach(e=>e.style.display=isAgent?"none":"");
+  const isMerchant=isMerchantRole();
+  const isIndependent=isIndependentAgentRole();
+  // Tout ce qui concerne la gestion des agents est strictement marchand.
+  document.querySelectorAll('button[data-page="agents"], #agents, #agentAccessRules').forEach(e=>{
+    e.style.setProperty("display",isMerchant?"":"none","important");
+  });
   document.querySelectorAll('[data-owner-only], .merchant-only').forEach(e=>e.style.display=isAgent?"none":"");
   if(isAgent){
     document.querySelectorAll('button[data-page="inventory"], #inventory').forEach(e=>e.style.display="none");
+  }
+  // Sécurité supplémentaire : même avec une navigation forcée, un agent
+  // indépendant ou rattaché est renvoyé vers le tableau de bord.
+  if(!isMerchant && document.getElementById("agents")?.classList.contains("active")){
+    showPage("dashboard");
   }
   updateDayUI(); applyAgentOperationLock(); showAgentOnlyProfileActions();
 }
@@ -725,7 +754,7 @@ let mpDbReady = false;
 
 if(window.supabase && MP_SUPABASE_CONFIGURED){
   mpSupabase = window.supabase.createClient(MP_SUPABASE_URL, MP_SUPABASE_ANON_KEY, {
-    auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
+    auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storage:window.localStorage}
   });
 }
 function mpDbError(error){ console.error("MoneyPro:",error); return error?.message || "Une erreur est survenue."; }
@@ -1118,6 +1147,83 @@ async function mpLoginByPhone(phone,password){
   if(error)throw error;
 }
 async function mpRefresh(){await mpLoadFromSupabase();showApp();}
+/* AUTH SUPABASE — persistance renforcée et démarrage sans faux écran de connexion */
+let mpAuthBooting = true;
+let mpAuthHandledSession = false;
+let mpAuthRecoveryTimer = null;
+
+function mpShowAuthLogin(){
+  mpAuthBooting = false;
+  document.getElementById("sessionRecovery")?.style.setProperty("display","none");
+  document.querySelector("#authScreen .tabs")?.style.removeProperty("display");
+  document.querySelectorAll("#authScreen form").forEach(f=>f.classList.remove("hidden"));
+  document.getElementById("authScreen").classList.remove("hidden");
+  document.getElementById("app").classList.add("hidden");
+  document.body.classList.remove("booting");
+  authView("login");
+}
+function mpShowSessionRecovery(text="Connexion sécurisée en cours. Vos identifiants ne seront pas redemandés."){
+  document.getElementById("app").classList.add("hidden");
+  document.getElementById("authScreen").classList.remove("hidden");
+  document.querySelector("#authScreen .tabs")?.style.setProperty("display","none");
+  document.querySelectorAll("#authScreen form").forEach(f=>f.classList.add("hidden"));
+  const box=document.getElementById("sessionRecovery");
+  if(box)box.style.display="block";
+  const txt=document.getElementById("sessionRecoveryText");
+  if(txt)txt.textContent=text;
+  document.body.classList.remove("booting");
+}
+function mpSleep(ms){return new Promise(r=>setTimeout(r,ms));}
+
+async function mpRestoreAuthenticatedSession(){
+  if(!mpSupabase)return false;
+  mpAuthBooting=true;
+  mpShowSessionRecovery();
+  let lastError=null;
+  for(let attempt=0;attempt<4;attempt++){
+    try{
+      // getSession() lit la session persistée dans le stockage local de Supabase.
+      const {data,error}=await mpSupabase.auth.getSession();
+      if(error)throw error;
+      const session=data?.session;
+      if(!session){
+        mpAuthHandledSession=false;
+        mpShowAuthLogin();
+        return false;
+      }
+      mpAuthHandledSession=true;
+      try{
+        await mpLoadFromSupabase();
+        showApp();
+        mpAuthBooting=false;
+        return true;
+      }catch(profileError){
+        lastError=profileError;
+        console.warn("MoneyPro: session restaurée, chargement du profil en attente",profileError);
+        if(attempt<3){
+          const txt=document.getElementById("sessionRecoveryText");
+          if(txt)txt.textContent="Session restaurée. Chargement de votre espace sécurisé…";
+          await mpSleep(700*(attempt+1));
+        }
+      }
+    }catch(e){
+      lastError=e;
+      console.warn("MoneyPro: restauration de session temporairement indisponible",e);
+      if(attempt<3){
+        const txt=document.getElementById("sessionRecoveryText");
+        if(txt)txt.textContent="Connexion conservée. Nouvelle tentative automatique…";
+        await mpSleep(700*(attempt+1));
+      }
+    }
+  }
+  // Une session existe toujours : surtout ne pas afficher l'écran de connexion.
+  // On laisse le rafraîchissement automatique de Supabase retenter sans déconnecter l'utilisateur.
+  mpAuthBooting=false;
+  mpShowSessionRecovery("Votre session est conservée. La connexion au serveur est momentanément indisponible ; nouvelle tentative automatique.");
+  if(lastError)console.error("MoneyPro: impossible de charger le profil après restauration de session",lastError);
+  return false;
+}
+
 /* AUTH SUPABASE */
 if(mpSupabase){
   document.getElementById("signupForm").onsubmit=async e=>{
@@ -1232,28 +1338,47 @@ if(mpSupabase){
     }catch(err){msg(mpDbError(err));}
   };
 
-  mpSupabase.auth.onAuthStateChange(async(event,session)=>{
-    if(event==="PASSWORD_RECOVERY"){
-      document.getElementById("app").classList.add("hidden");
-      document.getElementById("authScreen").classList.remove("hidden");
-      authView("reset");
-      document.body.classList.remove("booting");
-      return;
-    }
-    if(session && (event==="SIGNED_IN"||event==="INITIAL_SESSION")){
-      try{await mpLoadFromSupabase();showApp();}catch(e){console.error(e);}
-    }
-    if(event==="SIGNED_OUT"){
-      document.getElementById("app").classList.add("hidden");
-      document.getElementById("authScreen").classList.remove("hidden");
-      authView("login");
-      document.body.classList.remove("booting");
-    }
+  mpSupabase.auth.onAuthStateChange((event,session)=>{
+    // Ne pas exécuter le callback lourd directement dans le verrou interne de Supabase.
+    setTimeout(async()=>{
+      if(event==="PASSWORD_RECOVERY"){
+        document.getElementById("app").classList.add("hidden");
+        document.getElementById("authScreen").classList.remove("hidden");
+        document.querySelector("#authScreen .tabs")?.style.removeProperty("display");
+        document.getElementById("sessionRecovery")?.style.setProperty("display","none");
+        document.querySelectorAll("#authScreen form").forEach(f=>f.classList.remove("hidden"));
+        authView("reset");
+        document.body.classList.remove("booting");
+        return;
+      }
+      if(session && (event==="SIGNED_IN"||event==="INITIAL_SESSION"||event==="TOKEN_REFRESHED"||event==="USER_UPDATED")){
+        // TOKEN_REFRESHED ne doit jamais faire apparaître l'écran de connexion.
+        if(mpAuthHandledSession && (event==="TOKEN_REFRESHED"||event==="USER_UPDATED"))return;
+        try{
+          const hadHandledSession=mpAuthHandledSession;
+          mpAuthHandledSession=true;
+          await mpLoadFromSupabase();
+          showApp();
+        }catch(e){
+          console.warn("MoneyPro: session valide mais profil temporairement indisponible",e);
+          mpShowSessionRecovery("Session sécurisée conservée. Chargement de votre espace en cours…");
+        }
+        return;
+      }
+      if(event==="SIGNED_OUT"){
+        // Seul un vrai SIGNED_OUT, notamment après le bouton Déconnexion,
+        // affiche la connexion. Une expiration/réauthentification silencieuse
+        // est gérée par autoRefreshToken + persistSession.
+        mpAuthHandledSession=false;
+        mpShowAuthLogin();
+      }
+    },0);
   });
 
   const _oldLogout=logout;
   logout=async function(){
-    try{await mpSupabase.auth.signOut();}catch(e){console.error(e)}
+    try{await mpSupabase.auth.signOut();}
+    catch(e){console.error(e);}
     localStorage.removeItem("moneypro_session");
   };
   /* Opérations: le solde et l'écriture sont gérés atomiquement par PostgreSQL. */
@@ -1372,7 +1497,7 @@ if(mpSupabase){
     }
   });
 
-  document.addEventListener("DOMContentLoaded",async()=>{try{const u=await mpUser();if(u){await mpLoadFromSupabase();showApp();}else{document.getElementById("app").classList.add("hidden");document.getElementById("authScreen").classList.remove("hidden");authView("login");document.body.classList.remove("booting");}}catch(e){console.error(e);document.getElementById("app").classList.add("hidden");document.getElementById("authScreen").classList.remove("hidden");authView("login");document.body.classList.remove("booting");}});
+  document.addEventListener("DOMContentLoaded",async()=>{await mpRestoreAuthenticatedSession();});
 }
 </script>
 </body>
