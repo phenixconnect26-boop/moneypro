@@ -494,7 +494,7 @@ function startSubscription(kind,agentId=null){
  if(isAgent&&!agent)return;
  let first=isAgent?!agent.subscription.everSubscribed:!data.subscription.everSubscribed;
  let price=isAgent?(agent?.merchantId?500:1000):(first?1000:2000);
- openModal("Réabonnement via FedaPay",`<div class="plan active"><h3>${isAgent?"Abonnement agent":"Abonnement marchand"}</h3><div class="plan-price">${money(price)} / mois</div><small>${isAgent?"Agent : "+esc(agent.name):(first?"Premier abonnement":"Renouvellement")}</small></div><div class="notice" style="margin-top:13px">FedaPay sera intégré ici. Le paiement sera confirmé côté serveur avant activation de l'abonnement.</div><div class="actions"><button class="btn gray" onclick="closeModal()">Annuler</button><button class="btn" onclick="simulatePayment('${kind}','${agentId||""}',${price})">Simuler le paiement en démo</button></div>`);
+ openModal("Réabonnement via FedaPay",`<div class="plan active"><h3>${independent?"Abonnement agent indépendant":isAgent?"Abonnement agent":"Abonnement marchand"}</h3><div class="plan-price">${money(price)} / mois</div><small>${isAgent?"Agent : "+esc(agent.name):(first?"Premier abonnement":"Renouvellement")}</small></div><div class="notice" style="margin-top:13px">FedaPay sera intégré ici. Le paiement sera confirmé côté serveur avant activation de l'abonnement.</div><div class="actions"><button class="btn gray" onclick="closeModal()">Annuler</button><button class="btn" onclick="simulatePayment('${kind}','${agentId||""}',${price})">Simuler le paiement en démo</button></div>`);
 }
 function simulatePayment(kind,agentId,price){
  let start=new Date(),end=new Date(start);end.setMonth(end.getMonth()+1);
@@ -565,7 +565,8 @@ function paymentStatusDisplay(status){
 }
 function renderSubscriptionSummary(target,s,price,isAgent){
  const v=subscriptionDisplay(s);
- const independent=mpRole()==="agent" && !data.merchantId;
+ const type=mpAccountType();
+ const independent=type==="agent_independent";
  const label=independent?"ABONNEMENT AGENT INDÉPENDANT":isAgent?"ABONNEMENT AGENT":"ABONNEMENT MARCHAND";
  const dashLabel=document.getElementById("dashSubLabel");
  const subLabel=document.getElementById("subLabel");
@@ -598,7 +599,7 @@ function renderDashboard(){
 function renderSubscription(){
  const isAgent=mpRole()==="agent",a=getCurrentAgent(),s=isAgent?(a?.subscription||data.subscription||{status:"inactive",everSubscribed:false,expiresAt:null}):data.subscription||{status:"inactive",everSubscribed:false,expiresAt:null};
  const first=!s.everSubscribed;
- const price=isAgent?Number(s.price||(a?.merchantId?500:1000)):(first?1000:2000);
+ const price=isAgent?Number(s.price||(a?.merchantId?500:1000)):(mpAccountType()==="agent_independent"?1000:(first?1000:2000));
  renderSubscriptionSummary("subscription",s,price,isAgent);
  const rows=data.payments.filter(p=>!isAgent||p.agentId===a?.id);
  paymentsTable.innerHTML=rows.length?rows.map(p=>{const ps=paymentStatusDisplay(p.status);return `<tr><td>${fmt(p.date)}</td><td>${esc(p.account)}</td><td>${money(p.amount)}</td><td><span class="badge ${ps[1]}">${esc(ps[0])}</span></td><td>${esc(p.reference)}</td></tr>`}).join(""):`<tr><td colspan="5" class="empty">Aucun paiement.</td></tr>`;
@@ -629,7 +630,7 @@ function canAgentOperate(){return mpRole()!=="agent"||(agentSubscriptionActive()
 function updateDayUI(){const el=document.getElementById("dayStatus");if(!el)return;const d=getDay();el.innerHTML=d&&d.open?"<strong>Journée ouverte</strong><br>Ouverte le "+new Date(d.openedAt).toLocaleString():"<strong>Journée fermée</strong><br>Ouvrez une journée pour commencer les opérations."}
 function closeDayEntry(){if(!data.profile.dayStarted){alert("Aucune journée ouverte.");return}data.profile.closingBalances=Object.fromEntries(data.wallets.map(w=>[w.name,w.balance]));data.profile.dayStarted=false;data.profile.closedAt=isoNow();save();updateDayUI();alert("Journée clôturée. L’historique reste consultable.")}
 function applyAgentOperationLock(){const allowed=canAgentOperate();document.querySelectorAll('[data-operation-action], #operations button[type="submit"], #newOperationBtn').forEach(b=>{if(mpRole()==="agent"){b.disabled=!allowed;b.title=!agentSubscriptionActive()?"Abonnement agent inactif":(!accountDayOpen()?"Ouvrez votre journée":"")}})}
-function configureAgentView(){const isAgent=mpRole()==="agent";const rb=document.getElementById("agentReturnBar");if(rb)rb.style.display=isAgent?"block":"none";document.querySelectorAll('button[data-page="agents"], #agents, #agentAccessRules').forEach(e=>e.style.display=isAgent?"none":"");document.querySelectorAll('[data-owner-only], .merchant-only').forEach(e=>e.style.display=isAgent?"none":"");updateDayUI();applyAgentOperationLock();showAgentOnlyProfileActions();}
+function configureAgentView(){const type=mpAccountType();const isAgent=type!=="merchant";const rb=document.getElementById("agentReturnBar");if(rb)rb.style.display=isAgent?"block":"none";document.querySelectorAll('button[data-page="agents"], #agents, #agentAccessRules').forEach(e=>e.style.display=canManageAgents()?"":"none");document.querySelectorAll('[data-owner-only], .merchant-only').forEach(e=>e.style.display=isAgent?"none":"");updateDayUI();applyAgentOperationLock();showAgentOnlyProfileActions();}
 
 // --- Gestion explicite de la journée et des droits agent ---
 function moneyproCurrentRole(){
@@ -778,6 +779,15 @@ function mpWalletsFromRows(rows){
 }
 function mpProfileName(p){return p.full_name||p.name||"Marchand";}
 
+function mpAccountType(){
+  const p=data.profile||{};
+  if(p.accountType) return p.accountType;
+  if(p.role==="agent") return data.merchantId?"agent_attached":"agent_independent";
+  return "merchant";
+}
+function isIndependentAgent(){return mpAccountType()==="agent_independent";}
+function canManageAgents(){return mpAccountType()==="merchant";}
+
 async function mpLoadFromSupabase(){
   if(!mpSupabase)return false;
   const u=await mpUser(); if(!u)return false;
@@ -828,9 +838,7 @@ async function mpLoadFromSupabase(){
   data.merchantWallets=mpWalletsFromRows(merchantWalletRows);
 
   const findSub=(accountId,type)=>{
-    const rows=(subR.data||[]).filter(s=>
-      (s.account_id===accountId||s.profile_id===accountId)
-    );
+    const rows=(subR.data||[]).filter(s=>(s.account_id===accountId||s.profile_id===accountId));
     if(!rows.length)return null;
     if(type){
       const typed=rows.find(s=>String(s.subscriber_type||"").toLowerCase()===String(type).toLowerCase());
@@ -884,6 +892,7 @@ async function mpLoadFromSupabase(){
     email:me.email||u.email||"",
     note:me.note||"",
     merchantContactPhone:me.merchant_contact_phone||merchantProfileRow?.phone||"",
+    accountType:me.account_type||((me.role==="agent")?(merchantId?"agent_attached":"agent_independent"):"merchant"),
     dayStarted:!!ownDay,
     openingDate:ownDay?.opened_at||null,
     openingBalances:ownDay?.opening_balances||null
@@ -962,6 +971,7 @@ async function mpLoadFromSupabase(){
 
   data.merchantId=merchantId;
   localStorage.setItem("moneypro_role",me.role);
+  localStorage.setItem("moneypro_account_type",me.account_type||((me.role==="agent")?(merchantId?"agent_attached":"agent_independent"):"merchant"));
   if(me.role==="agent")localStorage.setItem("moneypro_agent_id",me.id);
   else localStorage.removeItem("moneypro_agent_id");
   restoreSessionAccount();
@@ -1128,7 +1138,7 @@ if(mpSupabase){
         email,password,
         options:{
           emailRedirectTo:"https://moneypro.phenixconnect.online",
-          data:{full_name:iaName.value.trim(),name:iaName.value.trim(),phone,role:"agent",account_type:"independent_agent",merchant_id:null,shop_name:null}
+          data:{full_name:iaName.value.trim(),name:iaName.value.trim(),phone,role:"merchant",account_type:"agent_independent",merchant_id:null,shop_name:null}
         }
       });
       if(error)throw error;
@@ -1239,7 +1249,7 @@ if(mpSupabase){
   saveDayOpening=async function(){const f={mtn:openingMTN.value,moov:openingMoov.value,celtiis:openingCeltiis.value,cash:openingCash.value};try{await mpOpenDayDb(f);await mpLoadFromSupabase();renderAll();updateDayUI();alert("Journée ouverte.");}catch(e){alert(mpDbError(e));}};
   closeDayEntry=async function(){try{await mpCloseDayDb();await mpLoadFromSupabase();renderAll();updateDayUI();alert("Journée clôturée.");}catch(e){alert(mpDbError(e));}};
   deactivateAgent=async function(id){if(confirm("Désactiver cet agent ? Son historique sera conservé.")){try{await mpDeactivateAgentDb(id);await mpLoadFromSupabase();renderAll();}catch(e){alert(mpDbError(e));}}};
-  openAgent=function(){openModal("Créer un agent",`<form id="agentForm" class="form-grid"><div class="notice full">L’agent rattaché aura son propre compte, ses propres portefeuilles et un abonnement de 500 F CFA/mois.</div><div class="field"><label>Nom complet</label><input name="name" required></div><div class="field"><label>Téléphone</label><input name="phone" required></div><div class="field"><label>Email de connexion</label><input name="email" type="email" required></div><div class="actions full"><button type="button" class="btn gray" onclick="closeModal()">Annuler</button><button class="btn">Créer l’agent</button></div></form>`);document.getElementById("agentForm").onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);try{const r=await mpCreateAgentDb({name:String(f.get("name")).trim(),phone:String(f.get("phone")).trim(),email:String(f.get("email")).trim().toLowerCase()});await mpLoadFromSupabase();closeModal();openModal("Agent créé",`<div class="notice"><b>${esc(r.name||f.get("name"))}</b> a été créé.</div><div class="stat-row"><span>Email</span><b>${esc(r.email||f.get("email"))}</b></div>${r.temporary_password?`<div class="stat-row"><span>Mot de passe temporaire</span><b>${esc(r.temporary_password)}</b></div>`:""}<div class="notice warning" style="margin-top:12px">L’agent devra modifier son mot de passe lors de sa première connexion.</div><div class="actions"><button class="btn" onclick="closeModal()">Fermer</button></div>`);}catch(err){alert(mpDbError(err));}}};
+  openAgent=function(){if(!canManageAgents()){alert("Un agent indépendant ne peut pas créer ni rattacher d’agents.");return;}openModal("Créer un agent",`<form id="agentForm" class="form-grid"><div class="notice full">L’agent rattaché aura son propre compte, ses propres portefeuilles et un abonnement de 500 F CFA/mois.</div><div class="field"><label>Nom complet</label><input name="name" required></div><div class="field"><label>Téléphone</label><input name="phone" required></div><div class="field"><label>Email de connexion</label><input name="email" type="email" required></div><div class="actions full"><button type="button" class="btn gray" onclick="closeModal()">Annuler</button><button class="btn">Créer l’agent</button></div></form>`);document.getElementById("agentForm").onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);try{const r=await mpCreateAgentDb({name:String(f.get("name")).trim(),phone:String(f.get("phone")).trim(),email:String(f.get("email")).trim().toLowerCase()});await mpLoadFromSupabase();closeModal();openModal("Agent créé",`<div class="notice"><b>${esc(r.name||f.get("name"))}</b> a été créé.</div><div class="stat-row"><span>Email</span><b>${esc(r.email||f.get("email"))}</b></div>${r.temporary_password?`<div class="stat-row"><span>Mot de passe temporaire</span><b>${esc(r.temporary_password)}</b></div>`:""}<div class="notice warning" style="margin-top:12px">L’agent devra modifier son mot de passe lors de sa première connexion.</div><div class="actions"><button class="btn" onclick="closeModal()">Fermer</button></div>`);}catch(err){alert(mpDbError(err));}}};
 
   /* ================================================================
      FEDAPAY V8 — paiement d'abonnement réel via Edge Function
@@ -1248,14 +1258,13 @@ if(mpSupabase){
   startSubscription=async function(kind,agentId=null){
     try{
       const isAgent=kind==="agent";
-      const currentUser=await mpUser();
-      const accountId=isAgent?(agentId||currentUser?.id):currentUser?.id;
+      const independent=mpAccountType()==="agent_independent";
+      const accountId=isAgent?(agentId||await mpUserId()):await mpUserId();
       if(!accountId)return;
-      const isIndependentAgent=isAgent && mpRole()==="agent" && !data.merchantId;
-      const account=isAgent?(isIndependentAgent?(data.profile||{}):(data.agents.find(a=>a.id===agentId)||{})):data.profile||{};
-      const first=!isAgent && !data.subscription.everSubscribed;
-      const amount=isAgent?(isIndependentAgent?1000:(account.merchantId?500:1000)):(first?1000:2000);
-      openModal("Paiement sécurisé FedaPay",`<div class="plan active"><h3>${isIndependentAgent?"Abonnement agent indépendant":isAgent?"Abonnement agent":"Abonnement marchand"}</h3><div class="plan-price">${money(amount)} / mois</div><small>${isAgent?"Agent : "+esc(account.name||""):(first?"Premier abonnement":"Renouvellement")}</small></div><div class="notice" style="margin-top:13px">Vous allez être redirigé vers la page de paiement sécurisée FedaPay. L’abonnement ne sera activé qu’après confirmation serveur.</div><div class="actions"><button class="btn gray" onclick="closeModal()">Annuler</button><button class="btn" id="fedapayContinue">Continuer vers FedaPay</button></div>`);
+      const account=(isAgent?data.agents.find(a=>a.id===agentId):data.profile)||{};
+      const first=!isAgent && !independent && !data.subscription.everSubscribed;
+      const amount=independent?1000:(isAgent?(account.merchantId?500:1000):(first?1000:2000));
+      openModal("Paiement sécurisé FedaPay",`<div class="plan active"><h3>${isAgent?"Abonnement agent":"Abonnement marchand"}</h3><div class="plan-price">${money(amount)} / mois</div><small>${isAgent?"Agent : "+esc(account.name||""):(first?"Premier abonnement":"Renouvellement")}</small></div><div class="notice" style="margin-top:13px">Vous allez être redirigé vers la page de paiement sécurisée FedaPay. L’abonnement ne sera activé qu’après confirmation serveur.</div><div class="actions"><button class="btn gray" onclick="closeModal()">Annuler</button><button class="btn" id="fedapayContinue">Continuer vers FedaPay</button></div>`);
       document.getElementById("fedapayContinue").onclick=async()=>{
         const btn=document.getElementById("fedapayContinue");
         try{
@@ -1267,7 +1276,7 @@ if(mpSupabase){
           const r=await fetch(MP_SUPABASE_URL+"/functions/v1/fedapay-create-payment",{
             method:"POST",
             headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},
-            body:JSON.stringify({account_id:accountId,account_type:isAgent?"agent":"merchant",callback_url:location.origin+location.pathname+"?fedapay_return=1"})
+            body:JSON.stringify({account_id:accountId,account_type:independent?"agent_independent":isAgent?"agent":"merchant",callback_url:location.origin+location.pathname+"?fedapay_return=1"})
           });
           const j=await r.json().catch(()=>({}));
           if(!r.ok)throw new Error(j.error||`Erreur FedaPay (${r.status})`);
@@ -1292,5 +1301,8 @@ if(mpSupabase){
   document.addEventListener("DOMContentLoaded",async()=>{try{const u=await mpUser();if(u){await mpLoadFromSupabase();showApp();}else{document.getElementById("app").classList.add("hidden");document.getElementById("authScreen").classList.remove("hidden");authView("login");document.body.classList.remove("booting");}}catch(e){console.error(e);document.getElementById("app").classList.add("hidden");document.getElementById("authScreen").classList.remove("hidden");authView("login");document.body.classList.remove("booting");}});
 }
 </script>
+
+<!-- SERVICE CLIENT WHATSAPP -->
+<a href="https://wa.me/2290153023080" target="_blank" rel="noopener noreferrer" aria-label="Service client WhatsApp" style="position:fixed;right:18px;bottom:18px;z-index:70;display:inline-flex;align-items:center;gap:8px;padding:11px 15px;border-radius:999px;background:#25D366;color:#fff;text-decoration:none;font-weight:800;font-size:12px;box-shadow:0 8px 25px #0003">💬 Service client au 0153023080</a>
 </body>
 </html>
