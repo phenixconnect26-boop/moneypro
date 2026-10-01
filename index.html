@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b1020">
-<title>MoneyPro V1.2 — Gestion Mobile Money</title>
+<title>MoneyPro V1.3 — Gestion Mobile Money</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{--bg:#f4f6fa;--card:#fff;--ink:#101828;--muted:#667085;--line:#e4e7ec;--blue:#155eef;--blue2:#0b4acb;--green:#12b76a;--red:#f04438;--orange:#f79009;--nav:#0b1020;--shadow:0 10px 30px #10182812}
@@ -27,7 +27,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:
 <!-- AUTHENTIFICATION -->
 <div id="authScreen" class="auth">
   <div class="auth-card">
-    <div class="logo">Money<span>Pro</span> <small style="font-size:13px;color:#667085;font-weight:800">V1.2</small></div>
+    <div class="logo">Money<span>Pro</span> <small style="font-size:13px;color:#667085;font-weight:800">V1.3</small></div>
     <h1 id="authTitle">Créer votre compte</h1>
     <p id="authSubtitle">Gérez vos opérations Mobile Money, votre caisse et votre stock.</p>
 
@@ -191,7 +191,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:
 
 <section id="subscription" class="page">
 <div class="grid sections">
-<div class="subscription"><div class="muted" style="font-size:11px" id="subLabel">ABONNEMENT</div><div style="font-size:28px;font-weight:900;margin:8px 0" id="subPrice">2 000 F / mois</div><div id="subState"></div><div class="muted" id="subExpires" style="margin-top:8px"></div><div class="muted" id="subRemaining" style="margin-top:4px"></div><button id="subAction" class="btn" style="margin-top:16px;background:#fff;color:#155eef" onclick="startSubscription('merchant')">S'abonner via FedaPay</button></div>
+<div class="subscription"><div class="muted" style="font-size:11px" id="subLabel">ABONNEMENT</div><div style="font-size:28px;font-weight:900;margin:8px 0" id="subPrice">—</div><div id="subState"></div><div class="muted" id="subExpires" style="margin-top:8px"></div><div class="muted" id="subRemaining" style="margin-top:4px"></div><button id="subAction" class="btn" style="display:none;margin-top:16px;background:#fff;color:#155eef" onclick="startSubscription('merchant')">S'abonner via FedaPay</button></div>
 <div class="card" id="subscriptionPricing"><h2>Tarification</h2><div id="planMerchant" class="plan pricing-plan"><h3>Marchand</h3><div class="plan-price">1 000 F</div><small>Premier abonnement après l'essai</small><div style="margin-top:9px;font-weight:700">Puis 2 000 F / mois</div></div><div id="planAttachedAgent" class="plan pricing-plan" style="margin-top:12px"><h3>Agent rattaché</h3><div class="plan-price">500 F</div><small>Par agent et par mois</small></div><div id="planIndependentAgent" class="plan pricing-plan" style="margin-top:12px"><h3>Agent indépendant</h3><div class="plan-price">1 000 F</div><small>Par mois, sans marchand de rattachement</small></div></div>
 </div>
 <div class="card" style="margin-top:15px"><h2>Historique des paiements</h2><div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Compte</th><th>Montant</th><th>Statut</th><th>Référence</th></tr></thead><tbody id="paymentsTable"></tbody></table></div></div>
@@ -207,7 +207,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:
 
 <script>
 /*
- MONEYPRO V1.2 — ARCHITECTURE PRÊTE POUR FEDAPAY
+ MONEYPRO V1.3 — ARCHITECTURE PRÊTE POUR FEDAPAY
 
  La connexion sécurisée est activée.
  Quand le projet sera créé :
@@ -333,15 +333,18 @@ function mpRole(){
 function mpAccountType(){
   return data.profile?.account_type || null;
 }
-function isMerchantRole(){
-  return mpRole()==="merchant" && mpAccountType()==="merchant";
+/* Source de vérité unique : rôle + account_type provenant de Supabase.
+   Aucun choix local ne peut déterminer le type de compte ou son tarif. */
+function mpAccountKind(){
+  const role=mpRole(), type=mpAccountType(), merchantId=data.profile?.merchant_id||null;
+  if(role==="merchant" && type==="merchant" && !merchantId) return "merchant";
+  if(role==="agent" && type==="agent_attached" && !!merchantId) return "agent_attached";
+  if(role==="agent_independent" && type==="agent_independent" && !merchantId) return "agent_independent";
+  return null;
 }
-function isAttachedAgentRole(){
-  return mpRole()==="agent" && mpAccountType()==="agent_attached" && !!data.profile?.merchant_id;
-}
-function isIndependentAgentRole(){
-  return mpRole()==="agent_independent" && mpAccountType()==="agent_independent";
-}
+function isMerchantRole(){ return mpAccountKind()==="merchant"; }
+function isAttachedAgentRole(){ return mpAccountKind()==="agent_attached"; }
+function isIndependentAgentRole(){ return mpAccountKind()==="agent_independent"; }
 function isAgentRole(role){
   return role === "agent" || role === "agent_independent";
 }
@@ -357,16 +360,17 @@ function getCurrentAgent(){
  };
 }
 function currentSubscriptionPrice(){
-  if(isMerchantRole()){
-    return data.subscription?.everSubscribed ? 2000 : 1000;
+  switch(mpAccountKind()){
+    case "merchant": return data.subscription?.everSubscribed ? 2000 : 1000;
+    case "agent_attached": return 500;
+    case "agent_independent": return 1000;
+    default: return null;
   }
-  if(isAttachedAgentRole()) return 500;
-  if(isIndependentAgentRole()) return 1000;
-  return null;
 }
 function subscriptionAccountKind(){
-  if(isMerchantRole()) return "merchant";
-  if(isAttachedAgentRole() || isIndependentAgentRole()) return "agent";
+  const kind=mpAccountKind();
+  if(kind==="merchant") return "merchant";
+  if(kind==="agent_attached" || kind==="agent_independent") return "agent";
   return null;
 }
 function getOperationContext(){
@@ -874,7 +878,7 @@ async function mpLoadFromSupabase(){
       subscription:{
         status:sub.status||"inactive",
         everSubscribed:!!sub.ever_subscribed,
-        price:Number(sub.price||(a.merchant_id?500:1000)),
+        price:500,
         startedAt:sub.started_at||sub.starts_at||null,
         expiresAt:sub.expires_at||null
       },
@@ -961,9 +965,14 @@ async function mpLoadFromSupabase(){
     sell:Number(x.sell_price??x.unit_price??0)
   }));
 
-  const rolePrice=me.role==="merchant"
+  const rolePrice=normalizedAccountType==="merchant"
     ? (!!ownSub.ever_subscribed?2000:1000)
-    : (normalizedAccountType==="agent_attached"?500:1000);
+    : normalizedAccountType==="agent_attached"
+      ? 500
+      : normalizedAccountType==="agent_independent"
+        ? 1000
+        : null;
+  if(rolePrice===null) throw new Error("Type de compte Supabase non pris en charge.");
   data.subscription={
     status:ownSub.status||"inactive",
     everSubscribed:!!ownSub.ever_subscribed,
@@ -988,6 +997,7 @@ async function mpLoadFromSupabase(){
   }).filter(x=>me.role==="merchant"||x.agentId===u.id);
 
   data.merchantId=merchantId;
+  mpSaveSessionCache();
   mpDbReady=true;
   return true;
 }
@@ -1174,16 +1184,76 @@ function mpShowSessionRecovery(text="Connexion sécurisée en cours. Vos identif
   document.body.classList.remove("booting");
 }
 function mpSleep(ms){return new Promise(r=>setTimeout(r,ms));}
+function mpWithTimeout(promise,ms,label="Opération trop longue"){
+  return Promise.race([
+    promise,
+    new Promise((_,reject)=>setTimeout(()=>reject(new Error(label)),ms))
+  ]);
+}
+function mpSaveSessionCache(){
+  try{
+    localStorage.setItem("moneypro_supabase_cache",JSON.stringify({
+      savedAt:Date.now(),
+      profile:data.profile||null,
+      subscription:data.subscription||null,
+      wallets:data.wallets||[],
+      merchantProfile:data.merchantProfile||null,
+      merchantWallets:data.merchantWallets||[],
+      agents:data.agents||[],
+      operations:data.operations||[],
+      expenses:data.expenses||[],
+      products:data.products||[],
+      payments:data.payments||[],
+      commissionTransfers:data.commissionTransfers||[],
+      dayHistory:data.dayHistory||[],
+      merchantId:data.merchantId||null
+    }));
+  }catch(e){console.warn("MoneyPro: cache locale non enregistrée",e);}
+}
+function mpRestoreSessionCache(){
+  try{
+    const raw=localStorage.getItem("moneypro_supabase_cache");
+    if(!raw)return false;
+    const c=JSON.parse(raw);
+    if(!c?.profile)return false;
+    Object.assign(data,{
+      profile:c.profile,subscription:c.subscription||data.subscription,
+      wallets:Array.isArray(c.wallets)?c.wallets:data.wallets,
+      merchantProfile:c.merchantProfile||data.merchantProfile,
+      merchantWallets:Array.isArray(c.merchantWallets)?c.merchantWallets:data.merchantWallets,
+      agents:Array.isArray(c.agents)?c.agents:data.agents,
+      operations:Array.isArray(c.operations)?c.operations:data.operations,
+      expenses:Array.isArray(c.expenses)?c.expenses:data.expenses,
+      products:Array.isArray(c.products)?c.products:data.products,
+      payments:Array.isArray(c.payments)?c.payments:data.payments,
+      commissionTransfers:Array.isArray(c.commissionTransfers)?c.commissionTransfers:data.commissionTransfers,
+      dayHistory:Array.isArray(c.dayHistory)?c.dayHistory:data.dayHistory,
+      merchantId:c.merchantId||null
+    });
+    return true;
+  }catch(e){console.warn("MoneyPro: cache locale invalide",e);return false;}
+}
+let mpBackgroundSyncTimer=null;
+function mpScheduleBackgroundSync(){
+  if(mpBackgroundSyncTimer)clearInterval(mpBackgroundSyncTimer);
+  mpBackgroundSyncTimer=setInterval(async()=>{
+    try{
+      const {data:s}=await mpSupabase.auth.getSession();
+      if(!s?.session)return;
+      await mpWithTimeout(mpLoadFromSupabase(),12000,"Synchronisation temporairement indisponible");
+      showApp();
+    }catch(e){console.warn("MoneyPro: synchronisation arrière-plan",e);}
+  },10000);
+}
 
 async function mpRestoreAuthenticatedSession(){
   if(!mpSupabase)return false;
   mpAuthBooting=true;
   mpShowSessionRecovery();
   let lastError=null;
-  for(let attempt=0;attempt<4;attempt++){
+  for(let attempt=0;attempt<3;attempt++){
     try{
-      // getSession() lit la session persistée dans le stockage local de Supabase.
-      const {data,error}=await mpSupabase.auth.getSession();
+      const {data,error}=await mpWithTimeout(mpSupabase.auth.getSession(),8000,"Récupération de session trop longue");
       if(error)throw error;
       const session=data?.session;
       if(!session){
@@ -1193,36 +1263,48 @@ async function mpRestoreAuthenticatedSession(){
       }
       mpAuthHandledSession=true;
       try{
-        await mpLoadFromSupabase();
+        await mpWithTimeout(mpLoadFromSupabase(),12000,"Serveur temporairement indisponible");
         showApp();
         mpAuthBooting=false;
+        mpScheduleBackgroundSync();
         return true;
       }catch(profileError){
         lastError=profileError;
-        console.warn("MoneyPro: session restaurée, chargement du profil en attente",profileError);
-        if(attempt<3){
-          const txt=document.getElementById("sessionRecoveryText");
-          if(txt)txt.textContent="Session restaurée. Chargement de votre espace sécurisé…";
-          await mpSleep(700*(attempt+1));
+        console.warn("MoneyPro: session valide, synchronisation en attente",profileError);
+        if(mpRestoreSessionCache()){
+          showApp();
+          mpAuthBooting=false;
+          mpScheduleBackgroundSync();
+          return true;
         }
       }
     }catch(e){
       lastError=e;
-      console.warn("MoneyPro: restauration de session temporairement indisponible",e);
-      if(attempt<3){
-        const txt=document.getElementById("sessionRecoveryText");
-        if(txt)txt.textContent="Connexion conservée. Nouvelle tentative automatique…";
-        await mpSleep(700*(attempt+1));
+      console.warn("MoneyPro: restauration temporairement indisponible",e);
+      if(mpRestoreSessionCache()){
+        showApp();
+        mpAuthBooting=false;
+        mpScheduleBackgroundSync();
+        return true;
       }
     }
+    if(attempt<2){
+      const txt=document.getElementById("sessionRecoveryText");
+      if(txt)txt.textContent="Session conservée. Synchronisation automatique en cours…";
+      await mpSleep(800*(attempt+1));
+    }
   }
-  // Une session existe toujours : surtout ne pas afficher l'écran de connexion.
-  // On laisse le rafraîchissement automatique de Supabase retenter sans déconnecter l'utilisateur.
   mpAuthBooting=false;
-  mpShowSessionRecovery("Votre session est conservée. La connexion au serveur est momentanément indisponible ; nouvelle tentative automatique.");
-  if(lastError)console.error("MoneyPro: impossible de charger le profil après restauration de session",lastError);
+  if(mpRestoreSessionCache()){
+    showApp();
+    mpScheduleBackgroundSync();
+    return true;
+  }
+  mpShowAuthLogin();
+  if(lastError)console.error("MoneyPro: impossible de restaurer la session",lastError);
   return false;
 }
+
 
 /* AUTH SUPABASE */
 if(mpSupabase){
@@ -1355,13 +1437,18 @@ if(mpSupabase){
         // TOKEN_REFRESHED ne doit jamais faire apparaître l'écran de connexion.
         if(mpAuthHandledSession && (event==="TOKEN_REFRESHED"||event==="USER_UPDATED"))return;
         try{
-          const hadHandledSession=mpAuthHandledSession;
           mpAuthHandledSession=true;
-          await mpLoadFromSupabase();
+          await mpWithTimeout(mpLoadFromSupabase(),12000,"Synchronisation temporairement indisponible");
           showApp();
+          mpScheduleBackgroundSync();
         }catch(e){
-          console.warn("MoneyPro: session valide mais profil temporairement indisponible",e);
-          mpShowSessionRecovery("Session sécurisée conservée. Chargement de votre espace en cours…");
+          console.warn("MoneyPro: session valide mais synchronisation temporairement indisponible",e);
+          if(mpRestoreSessionCache()){
+            showApp();
+            mpScheduleBackgroundSync();
+          }else{
+            mpShowSessionRecovery("Session sécurisée conservée. Synchronisation automatique en cours…");
+          }
         }
         return;
       }
