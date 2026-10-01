@@ -317,7 +317,7 @@ document.getElementById("loginForm").onsubmit=e=>{
  msg("Compte introuvable ou identifiants incorrects.");
 };
 document.getElementById("forgotForm").onsubmit=e=>{e.preventDefault();msg("Un lien sécurisé de réinitialisation vous sera envoyé automatiquement.",true)};
-function showApp(){restoreSessionAccount();document.getElementById("authScreen").classList.add("hidden");document.getElementById("app").classList.remove("hidden");document.body.classList.remove("booting");loadSettings();renderAll();configureAgentView();populateMerchantAgentSelector()}
+function showApp(){if(!mpSupabase)restoreSessionAccount();document.getElementById("authScreen").classList.add("hidden");document.getElementById("app").classList.remove("hidden");document.body.classList.remove("booting");loadSettings();renderAll();configureAgentView();populateMerchantAgentSelector()}
 function logout(){persistCurrentAccount();switchToMerchant();localStorage.removeItem("moneypro_session");document.getElementById("app").classList.add("hidden");document.getElementById("authScreen").classList.remove("hidden");document.body.classList.remove("booting");authView("login")}
 function resetAll(){if(confirm("Effacer toutes les données locales ?")){localStorage.removeItem(STORAGE);location.reload()}}
 
@@ -330,6 +330,12 @@ function openModal(t,b){modalTitle.textContent=t;modalBody.innerHTML=b;modal.cla
 function closeModal(){modal.classList.remove("open")}
 
 /* OPÉRATIONS */
+function mpRole(){
+  return data.profile?.role || null;
+}
+function isAgentRole(role){
+  return role === "agent" || role === "agent_independent";
+}
 function getCurrentAgent(){
  const id=localStorage.getItem("moneypro_agent_id")||"";
  return data.agents.find(a=>a.id===id)||null;
@@ -676,10 +682,15 @@ function applyAgentOperationLock(){
   });
 }
 function configureAgentView(){
-  const isAgent=isAgentRole(mpRole());
-  const rb=document.getElementById("agentReturnBar"); if(rb)rb.style.display=isAgent?"block":"none";
+  const role=mpRole();
+  const isAgent=isAgentRole(role);
+  const isIndependent=role === "agent_independent";
+  const rb=document.getElementById("agentReturnBar"); if(rb)rb.style.display=isAgent?"none":"none";
   document.querySelectorAll('button[data-page="agents"], #agents, #agentAccessRules').forEach(e=>e.style.display=isAgent?"none":"");
   document.querySelectorAll('[data-owner-only], .merchant-only').forEach(e=>e.style.display=isAgent?"none":"");
+  if(isIndependent){
+    document.querySelectorAll('button[data-page="inventory"], #inventory').forEach(e=>e.style.display="none");
+  }
   updateDayUI(); applyAgentOperationLock(); showAgentOnlyProfileActions();
 }
 
