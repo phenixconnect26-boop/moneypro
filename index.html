@@ -189,7 +189,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:
 <section id="subscription" class="page">
 <div class="grid sections">
 <div class="subscription"><div class="muted" style="font-size:11px" id="subLabel">ABONNEMENT</div><div style="font-size:28px;font-weight:900;margin:8px 0" id="subPrice">2 000 F / mois</div><div id="subState"></div><div class="muted" id="subExpires" style="margin-top:8px"></div><div class="muted" id="subRemaining" style="margin-top:4px"></div><button id="subAction" class="btn" style="margin-top:16px;background:#fff;color:#155eef" onclick="startSubscription('merchant')">S'abonner via FedaPay</button></div>
-<div class="card"><h2>Tarification</h2><div class="plan active"><h3>Marchand</h3><div class="plan-price">1 000 F</div><small>Premier abonnement après l'essai</small><div style="margin-top:9px;font-weight:700">Puis 2 000 F / mois</div></div><div class="plan" style="margin-top:12px"><h3>Agent rattaché</h3><div class="plan-price">500 F</div><small>Par agent et par mois</small></div><div class="plan" style="margin-top:12px"><h3>Agent indépendant</h3><div class="plan-price">1 000 F</div><small>Par mois, sans marchand de rattachement</small></div></div>
+<div class="card"><h2>Tarification</h2><div id="planMerchant" class="plan active"><h3>Marchand</h3><div class="plan-price">1 000 F</div><small>Premier abonnement après l'essai</small><div style="margin-top:9px;font-weight:700">Puis 2 000 F / mois</div></div><div id="planAgentAttached" class="plan" style="margin-top:12px"><h3>Agent rattaché</h3><div class="plan-price">500 F</div><small>Par agent et par mois</small></div><div id="planAgentIndependent" class="plan" style="margin-top:12px"><h3>Agent indépendant</h3><div class="plan-price">1 000 F</div><small>Par mois, sans marchand de rattachement</small></div></div>
 </div>
 <div class="card" style="margin-top:15px"><h2>Historique des paiements</h2><div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Compte</th><th>Montant</th><th>Statut</th><th>Référence</th></tr></thead><tbody id="paymentsTable"></tbody></table></div></div>
 </section>
@@ -568,7 +568,9 @@ function renderDashboard(){
  renderSubscriptionSummary("dashboard",s,Number(s.price|| (isAgent?(a?.merchantId?500:1000):(!s.everSubscribed?1000:2000))),isAgent);
 }
 function renderSubscription(){
- const isAgent=isAgentRole(mpRole()),a=getCurrentAgent(),s=isAgent?(a?.subscription||data.subscription||{status:"inactive",everSubscribed:false,expiresAt:null}):data.subscription||{status:"inactive",everSubscribed:false,expiresAt:null};
+ const role=mpRole(),isAgent=isAgentRole(role),a=getCurrentAgent(),s=isAgent?(a?.subscription||data.subscription||{status:"inactive",everSubscribed:false,expiresAt:null}):data.subscription||{status:"inactive",everSubscribed:false,expiresAt:null};
+ const label=document.getElementById("subLabel");
+ if(label) label.textContent=role==="merchant"?"ABONNEMENT MARCHAND":role==="agent_independent"?"ABONNEMENT AGENT INDÉPENDANT":"ABONNEMENT AGENT RATTACHÉ";
  const first=!s.everSubscribed;
  const price=isAgent?Number(s.price||(a?.merchantId?500:1000)):(first?1000:2000);
  renderSubscriptionSummary("subscription",s,price,isAgent);
@@ -657,11 +659,26 @@ function configureAgentView(){
   const role=mpRole();
   const isAgent=isAgentRole(role);
   const isIndependent=role === "agent_independent";
+  const isAttached=role === "agent";
+
+  /* Un agent ne doit jamais voir la gestion des agents rattachés. */
   document.querySelectorAll('button[data-page="agents"], #agents, #agentAccessRules').forEach(e=>e.style.display=isAgent?"none":"");
   document.querySelectorAll('[data-owner-only], .merchant-only').forEach(e=>e.style.display=isAgent?"none":"");
   if(isAgent){
     document.querySelectorAll('button[data-page="inventory"], #inventory').forEach(e=>e.style.display="none");
   }
+
+  /* Tarification : chaque type de compte ne voit que son propre abonnement. */
+  const planMerchant=document.getElementById("planMerchant");
+  const planAttached=document.getElementById("planAgentAttached");
+  const planIndependent=document.getElementById("planAgentIndependent");
+  if(planMerchant) planMerchant.style.display=isAgent?"none":"";
+  if(planAttached) planAttached.style.display=isAttached?"":"none";
+  if(planIndependent) planIndependent.style.display=isIndependent?"":"none";
+
+  const dashLabel=document.querySelector("#dashboard .subscription .muted");
+  if(dashLabel) dashLabel.textContent=isIndependent?"ABONNEMENT AGENT INDÉPENDANT":isAttached?"ABONNEMENT AGENT RATTACHÉ":"ABONNEMENT MARCHAND";
+
   updateDayUI(); applyAgentOperationLock(); showAgentOnlyProfileActions();
 }
 
