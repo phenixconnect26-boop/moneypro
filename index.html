@@ -115,19 +115,29 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:
     <div class="card"><div class="section-title"><h2>Dernières opérations</h2><button class="btn secondary small" onclick="showPage('operations')">Tout voir</button></div><div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Type</th><th>Compte</th><th>Montant</th><th>Commission</th></tr></thead><tbody id="recentOps"></tbody></table></div></div>
     <div class="card"><div class="section-title"><h2>Portefeuilles</h2><button class="btn secondary small" onclick="showPage('wallets')">Détails</button></div><div id="dashWallets" class="list-grid"></div></div>
   </div>
-  <div class="subscription" style="margin-top:15px"><div class="muted" style="font-size:11px">ABONNEMENT MARCHAND</div><div style="font-size:21px;font-weight:850;margin:5px 0" id="dashSubStatus">Actif</div><div class="muted" id="dashSubDate">—</div></div>
+  <div class="subscription" style="margin-top:15px"><div class="muted" style="font-size:11px">ABONNEMENT MARCHAND</div><div style="font-size:21px;font-weight:850;margin:5px 0" id="dashSubStatus"></div><div class="muted" id="dashSubDate"></div></div>
 </section>
 
 <section id="dayManagement" class="section">
 <h2>Journée de travail</h2>
-<div id="dayStatus" class="card">Journée non ouverte.</div><div id="agentReturnBar" class="notice" style="display:none;margin-top:10px"><b>Mode agent</b> — vous consultez uniquement le compte de cet agent. <button class="btn small" onclick="switchToMerchant();showApp()">Retour au compte marchand</button></div>
+<div id="dayStatus" class="card">Journée non ouverte.</div>
+<div id="dayVariancePanel" class="card" style="margin-top:12px;display:none">
+  <div class="section-title"><h3>Écart de caisse</h3><span id="dayVarianceTotal" class="badge">0 F</span></div>
+  <div id="dayVarianceTable" class="table-wrap"></div>
+  <div id="dayVarianceNote" class="sub" style="margin-top:10px"></div>
+</div>
+<div id="dayHistoryPanel" class="card" style="margin-top:12px">
+  <div class="section-title"><h3>Historique des clôtures</h3></div>
+  <div id="dayHistoryTable" class="table-wrap"><div class="empty">Aucune journée clôturée.</div></div>
+</div>
+<div id="agentReturnBar" class="notice" style="display:none;margin-top:10px"><b>Mode agent</b> — vous consultez uniquement le compte de cet agent. <button class="btn small" onclick="switchToMerchant();showApp()">Retour au compte marchand</button></div>
 <div class="day-actions">
 <button type="button" onclick="openDayEntry()">Ouvrir la journée</button>
 <button type="button" onclick="closeDayEntry()">Clôturer la journée</button>
 </div>
 <div id="dayEntryPanel" class="card" style="display:none">
 <h3 id="dayEntryTitle">Ouverture de journée</h3>
-<p>Saisissez les soldes disponibles au début de la journée.</p>
+<p>Saisissez les soldes réellement disponibles au début de la journée. Une journée doit être ouverte avant toute opération.</p>
 <div class="grid">
 <label>MTN<input id="openingMTN" type="number" min="0" step="1" value="0"></label>
 <label>Moov<input id="openingMoov" type="number" min="0" step="1" value="0"></label>
@@ -179,7 +189,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:
 
 <section id="subscription" class="page">
 <div class="grid sections">
-<div class="subscription"><div class="muted" style="font-size:11px" id="subLabel">ABONNEMENT</div><div style="font-size:28px;font-weight:900;margin:8px 0" id="subPrice">2 000 F / mois</div><div id="subState"><span class="badge green">Actif</span></div><div class="muted" id="subExpires" style="margin-top:8px">Expire le —</div><div class="muted" id="subRemaining" style="margin-top:4px"></div><button id="subAction" class="btn" style="margin-top:16px;background:#fff;color:#155eef" onclick="startSubscription('merchant')">S'abonner via FedaPay</button></div>
+<div class="subscription"><div class="muted" style="font-size:11px" id="subLabel">ABONNEMENT</div><div style="font-size:28px;font-weight:900;margin:8px 0" id="subPrice">2 000 F / mois</div><div id="subState"></div><div class="muted" id="subExpires" style="margin-top:8px"></div><div class="muted" id="subRemaining" style="margin-top:4px"></div><button id="subAction" class="btn" style="margin-top:16px;background:#fff;color:#155eef" onclick="startSubscription('merchant')">S'abonner via FedaPay</button></div>
 <div class="card"><h2>Tarification</h2><div class="plan active"><h3>Marchand</h3><div class="plan-price">1 000 F</div><small>Premier abonnement après l'essai</small><div style="margin-top:9px;font-weight:700">Puis 2 000 F / mois</div></div><div class="plan" style="margin-top:12px"><h3>Agent rattaché</h3><div class="plan-price">500 F</div><small>Par agent et par mois</small></div><div class="plan" style="margin-top:12px"><h3>Agent indépendant</h3><div class="plan-price">1 000 F</div><small>Par mois, sans marchand de rattachement</small></div></div>
 </div>
 <div class="card" style="margin-top:15px"><h2>Historique des paiements</h2><div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Compte</th><th>Montant</th><th>Statut</th><th>Référence</th></tr></thead><tbody id="paymentsTable"></tbody></table></div></div>
@@ -210,8 +220,8 @@ const STORAGE="moneypro_complete_v2";
 
 const initialData={
  profile:{
-  role:"merchant",shopName:"Ma boutique Mobile Money",name:"Marchand Démo",
-  phone:"",email:"demo@moneypro.local"
+  role:"merchant",shopName:"Ma boutique Mobile Money",name:"",
+  phone:"",email:""
  },
  wallets:[
   {id:"mtn",name:"MTN",balance:0},
@@ -238,7 +248,7 @@ let data=load();
 if(!data.merchantProfile)data.merchantProfile=clone(data.profile||initialData.profile);
 if(!data.merchantWallets)data.merchantWallets=clone(data.wallets||initialData.wallets);
 if(!Array.isArray(data.agents))data.agents=[];
-data.agents.forEach(a=>{a.wallets=a.wallets||clone(initialData.wallets);a.profile=a.profile||{role:"agent",name:a.name,shopName:data.merchantProfile.shopName,phone:a.phone,email:a.email,merchantContactPhone:data.merchantProfile.phone||"",dayStarted:false,openingDate:null};a.status=a.status||"active";a.subscription=a.subscription||{status:"inactive",expiresAt:null,everSubscribed:false,price:1000};});
+data.agents.forEach(a=>{a.wallets=a.wallets||clone(initialData.wallets);a.profile=a.profile||{role:"agent",account_type:"agent_attached",merchant_id:null,name:a.name,shopName:data.merchantProfile.shopName,phone:a.phone,email:a.email,merchantContactPhone:data.merchantProfile.phone||"",dayStarted:false,openingDate:null};a.status=a.status||"active";a.subscription=a.subscription||{status:"inactive",expiresAt:null,everSubscribed:false,price:1000};});
 function persistCurrentAccount(){
  const role=localStorage.getItem("moneypro_role")||"merchant",aid=localStorage.getItem("moneypro_agent_id")||"";
  if(role==="agent"&&aid){const a=data.agents.find(x=>x.id===aid);if(a){a.profile=clone(data.profile);a.wallets=clone(data.wallets);}}
@@ -318,24 +328,6 @@ document.querySelectorAll(".nav button").forEach(b=>b.onclick=()=>showPage(b.dat
 function toggleSidebar(){document.getElementById("sidebar").classList.toggle("open")}
 function openModal(t,b){modalTitle.textContent=t;modalBody.innerHTML=b;modal.classList.add("open")}
 function closeModal(){modal.classList.remove("open")}
-
-/* OUVERTURE DE JOURNÉE */
-function openDayStart(){
- openModal("Ouverture de journée",`<div class="notice">Avant sa première opération, l’agent doit enregistrer les soldes disponibles au début de sa journée.</div>
- <form id="dayStartForm" class="form-grid" style="margin-top:13px">
- <div class="field"><label>Solde MTN</label><input name="mtn" type="number" min="0" value="0" required></div>
- <div class="field"><label>Solde Moov</label><input name="moov" type="number" min="0" value="0" required></div>
- <div class="field"><label>Solde Celtiis</label><input name="celtiis" type="number" min="0" value="0" required></div>
- <div class="field"><label>Espèces en caisse</label><input name="cash" type="number" min="0" value="0" required></div>
- <div class="field full"><div class="actions"><button type="button" class="btn gray" onclick="closeModal()">Annuler</button><button class="btn">Commencer la journée</button></div></div></form>`);
- document.getElementById("dayStartForm").onsubmit=e=>{e.preventDefault();let f=new FormData(e.target);[["MTN","mtn"],["Moov","moov"],["Celtiis","celtiis"],["Espèces","cash"]].forEach(([name,key])=>{let w=findWallet(name);if(w)w.balance=+f.get(key)||0});data.profile.dayStarted=true;data.profile.openingDate=isoNow();data.profile.openingBalances={MTN:+f.get("mtn")||0,Moov:+f.get("moov")||0,Celtiis:+f.get("celtiis")||0,Espèces:+f.get("cash")||0};save();closeModal();alert("Journée ouverte. Vous pouvez maintenant enregistrer les opérations.")};
-}
-function ensureDayStart(){
- const notice=document.getElementById("dayStartNotice"),btn=document.getElementById("newOperationBtn");
- const locked=isAgentRole(role)&&!data.profile.dayStarted;
- if(notice)notice.innerHTML=locked?`<div class="day-lock"><b>Journée non ouverte.</b> Saisissez les soldes de départ avant de commencer les opérations. <button class="btn small" style="margin-left:8px" onclick="openDayStart()">Saisir les soldes</button></div>`:"";
- if(btn)btn.disabled=locked;
-}
 
 /* OPÉRATIONS */
 function getCurrentAgent(){
@@ -467,7 +459,11 @@ function openAgent(){
  };
 }
 function renderAgents(){
- agentsTable.innerHTML=data.agents.length?data.agents.map(a=>`<tr><td><b>${esc(a.name)}</b><br><small>${esc(a.email)}</small></td><td>${esc(a.phone)}</td><td>${a.status!=="inactive"?'<span class="badge green">Actif</span>':'<span class="badge red">Désactivé</span>'}</td><td>${a.subscription.status==="active"&&(!a.subscription.expiresAt||new Date(a.subscription.expiresAt)>new Date())?'<span class="badge green">Actif</span>':'<span class="badge red">Inactif</span>'}</td><td><button class="btn secondary small" onclick="startSubscription('agent','${a.id}')">Abonnement</button> <button class="btn small" onclick="switchToAgent('${a.id}')">Ouvrir</button> <button class="btn danger small" onclick="deactivateAgent('${a.id}')">Désactiver</button></td></tr>`).join(""):`<tr><td colspan="5" class="empty">Aucun agent.</td></tr>`;
+ agentsTable.innerHTML=data.agents.length?data.agents.map(a=>{
+   const sv=subscriptionDisplay(a.subscription||{});
+   const subText=sv.key==="trial"?sv.date:(sv.key==="active"?sv.date:"Expiré");
+   return `<tr><td><b>${esc(a.name)}</b><br><small>${esc(a.email)}</small></td><td>${esc(a.phone)}</td><td><span class="role-pill">Agent rattaché</span></td><td>${a.status!=="inactive"?'<span class="badge green">Actif</span>':'<span class="badge red">Désactivé</span>'}</td><td><span class="badge ${sv.badge}">${esc(subText)}</span></td><td><button class="btn secondary small" onclick="startSubscription('agent','${a.id}')">Abonnement</button> <button class="btn small" onclick="switchToAgent('${a.id}')">Ouvrir</button> <button class="btn danger small" onclick="deactivateAgent('${a.id}')">Désactiver</button></td></tr>`;
+ }).join(""):`<tr><td colspan="6" class="empty">Aucun agent rattaché.</td></tr>`;
 }
 function deactivateAgent(id){const a=data.agents.find(x=>x.id===id);if(!a)return;if(confirm("Désactiver cet agent ? Son historique sera conservé.")){a.status="inactive";save()}}
 function switchToAgent(id){
@@ -495,14 +491,9 @@ function startSubscription(kind,agentId=null){
  if(isAgent&&!agent)return;
  let first=isAgent?!agent.subscription.everSubscribed:!data.subscription.everSubscribed;
  let price=isAgent?(agent?.merchantId?500:1000):(first?1000:2000);
- openModal("Réabonnement via FedaPay",`<div class="plan active"><h3>${isAgent?"Abonnement agent":"Abonnement marchand"}</h3><div class="plan-price">${money(price)} / mois</div><small>${isAgent?"Agent : "+esc(agent.name):(first?"Premier abonnement":"Renouvellement")}</small></div><div class="notice" style="margin-top:13px">FedaPay sera intégré ici. Le paiement sera confirmé côté serveur avant activation de l'abonnement.</div><div class="actions"><button class="btn gray" onclick="closeModal()">Annuler</button><button class="btn" onclick="simulatePayment('${kind}','${agentId||""}',${price})">Simuler le paiement en démo</button></div>`);
+ openModal("Réabonnement via FedaPay",`<div class="plan active"><h3>${isAgent?"Abonnement agent":"Abonnement marchand"}</h3><div class="plan-price">${money(price)} / mois</div><small>${isAgent?"Agent : "+esc(agent.name):(first?"Premier abonnement":"Renouvellement")}</small></div><div class="notice" style="margin-top:13px">FedaPay sera intégré ici. Le paiement sera confirmé côté serveur avant activation de l'abonnement.</div><div class="actions"><button class="btn gray" onclick="closeModal()">Annuler</button><button class="btn" onclick="simulatePayment('${kind}','${agentId||""}',${price})">Paiement réel via FedaPay</button></div>`);
 }
-function simulatePayment(kind,agentId,price){
- let start=new Date(),end=new Date(start);end.setMonth(end.getMonth()+1);
- if(kind==="merchant"){data.subscription={status:"active",everSubscribed:true,price,startedAt:start.toISOString(),expiresAt:end.toISOString()};data.payments.unshift({id:uid(),date:isoNow(),account:"Marchand",amount:price,status:"paid",reference:"DEMO-"+uid()})}
- else {let a=data.agents.find(x=>x.id===agentId);a.subscription={status:"active",everSubscribed:true,price:a.merchantId?500:1000,expiresAt:end.toISOString()};data.payments.unshift({id:uid(),date:isoNow(),account:"Agent — "+a.name,agentId:a.id,amount:a.merchantId?500:1000,status:"paid",reference:"DEMO-"+uid()})}
- save();closeModal();alert("Paiement de démonstration enregistré. En production, cette étape sera remplacée par la confirmation FedaPay.");
-}
+function simulatePayment(){ alert("Les paiements de démonstration sont désactivés. Utilisez FedaPay."); }
 
 /* REPORTS */
 function renderReports(){
@@ -532,7 +523,7 @@ function renderReports(){
 }
 
 /* SETTINGS */
-function loadSettings(){shopName.value=data.profile.shopName;merchantName.value=data.profile.name;merchantPhone.value=data.profile.phone;merchantEmail.value=data.profile.email;shopNote.value=data.profile.note||"";merchantContactPhone.value=data.profile.merchantContactPhone||"";document.getElementById("agentMerchantContact").classList.toggle("hidden",!isAgentRole(data.profile.role));sideName.textContent=data.profile.name;sideRole.textContent=data.profile.role==="merchant"?"Marchand":"Agent";ensureDayStart()}
+function loadSettings(){shopName.value=data.profile.shopName;merchantName.value=data.profile.name;merchantPhone.value=data.profile.phone;merchantEmail.value=data.profile.email;shopNote.value=data.profile.note||"";merchantContactPhone.value=data.profile.merchantContactPhone||"";document.getElementById("agentMerchantContact").classList.toggle("hidden",!isAgentRole(data.profile.role));sideName.textContent=data.profile.name||"";sideRole.textContent=roleDisplayLabel(data.profile.role,data.profile.account_type,data.profile.merchant_id);ensureDayStart()}
 settingsForm.onsubmit=e=>{e.preventDefault();data.profile.shopName=shopName.value;data.profile.name=merchantName.value;data.profile.phone=merchantPhone.value;data.profile.email=merchantEmail.value;data.profile.merchantContactPhone=merchantContactPhone.value.trim();data.profile.note=shopNote.value;save();alert("Paramètres enregistrés.")}
 
 /* DASHBOARD + SUB */
@@ -540,22 +531,29 @@ function visibleOperations(){
  const role=mpRole(),aid=localStorage.getItem("moneypro_agent_id")||"";
  return isAgentRole(role)?data.operations.filter(o=>o.agentId===aid):data.operations;
 }
+function roleDisplayLabel(role,accountType,merchantId){
+ if(role==="merchant" && accountType==="merchant") return "Marchand";
+ if(role==="agent_independent" && accountType==="agent_independent") return "Agent indépendant";
+ if(role==="agent" && accountType==="agent_attached" && merchantId) return "Agent rattaché";
+ if(role==="merchant") return "Marchand";
+ if(role==="agent_independent") return "Agent indépendant";
+ if(role==="agent") return merchantId?"Agent rattaché":"Agent rattaché";
+ return "";
+}
 function subscriptionDisplay(s){
  const now=new Date();
  const expiry=s?.expiresAt?new Date(s.expiresAt):null;
  const validExpiry=expiry&&!Number.isNaN(expiry.getTime());
  const active=s?.status==="active" && (!validExpiry || expiry>now);
  const trial=active && !s?.everSubscribed && validExpiry;
- const pending=s?.status==="pending";
  const expired=validExpiry && expiry<=now;
  if(trial){
-   const ms=expiry-now; const days=Math.max(0,Math.ceil(ms/86400000));
-   return {key:"trial",label:"Essai gratuit",badge:"orange",date:"Essai jusqu'au "+fmt(s.expiresAt),remaining:days>1?days+" jours restants":days===1?"1 jour restant":"Essai arrivant à expiration",active:false};
+   const ms=Math.max(0,expiry-now); const days=Math.max(0,Math.ceil(ms/86400000));
+   return {key:"trial",label:"Essai",badge:"orange",date:"Essai + "+days+" "+(days===1?"jour":"jours"),remaining:"",active:false};
  }
- if(pending) return {key:"pending",label:"Paiement en attente",badge:"orange",date:validExpiry?"Expire le "+fmt(s.expiresAt):"En attente de confirmation FedaPay",remaining:"Le paiement sera activé après confirmation.",active:false};
- if(active) return {key:"active",label:"Actif",badge:"green",date:validExpiry?"Expire le "+fmt(s.expiresAt):"Abonnement actif",remaining:"",active:true};
- if(expired || s?.status==="expired") return {key:"expired",label:"Abonnement expiré",badge:"red",date:"Expiré le "+fmt(s.expiresAt),remaining:"Effectuez un paiement pour réactiver votre abonnement.",active:false};
- return {key:"inactive",label:"Inactif",badge:"red",date:"Aucun abonnement actif",remaining:"Abonnement requis pour effectuer des opérations.",active:false};
+ if(active) return {key:"active",label:"Actif",badge:"green",date:validExpiry?"Actif jusqu'au "+fmt(s.expiresAt):"Actif",remaining:"",active:true};
+ if(expired || s?.status==="expired" || s?.status==="pending" || !s?.status) return {key:"expired",label:"Expiré",badge:"red",date:"Expiré",remaining:"",active:false};
+ return {key:"expired",label:"Expiré",badge:"red",date:"Expiré",remaining:"",active:false};
 }
 function paymentStatusDisplay(status){
  const k=String(status||"pending").toLowerCase();
@@ -577,8 +575,8 @@ function renderSubscriptionSummary(target,s,price,isAgent){
  subRemaining.textContent=v.remaining||"";
  const action=document.getElementById("subAction");
  if(action){
-   action.textContent=v.key==="pending"?"Paiement en cours":(v.active?"Renouveler via FedaPay":"S'abonner via FedaPay");
-   action.disabled=v.key==="pending";
+   action.textContent=v.active?"Renouveler via FedaPay":"S'abonner via FedaPay";
+   action.disabled=false;
    action.style.opacity=action.disabled?".65":"1";
    action.onclick=()=>{if(!action.disabled)startSubscription(isAgent?"agent":"merchant",isAgent?(getCurrentAgent()?.id||null):null)};
  }
@@ -601,7 +599,7 @@ function renderSubscription(){
 
 /* GLOBAL */
 function renderAll(){
- renderCommissionTransfers();loadSettings();renderDashboard();renderOperations();renderWallets();renderExpenses();renderInventory();renderAgents();renderReports();renderSubscription()}
+ renderCommissionTransfers();loadSettings();renderDashboard();renderOperations();renderWallets();renderExpenses();renderInventory();renderAgents();renderReports();renderSubscription();renderDayHistory()}
 if(localStorage.getItem("moneypro_session")==="1")showApp();
 else document.getElementById("authScreen").classList.remove("hidden");
 
@@ -612,131 +610,79 @@ function openMerchantWhatsApp(){ saveMerchantPhone(); const n=normalizePhone(get
 function callMerchant(){ saveMerchantPhone(); const n=normalizePhone(getMerchantPhone()); if(!n){ alert("Enregistrez d'abord le numéro du marchand."); return; } window.location.href="tel:"+n; }
 (function(){ const el=document.getElementById("merchantContactPhone"); if(el) el.value=getMerchantPhone(); })();
 
-// Compatibilité : une journée est portée par le compte courant, pas par le marchand global.
-function accountDayOpen(){return !!data.profile.dayStarted}
-function openDayStart(){
- openModal("Ouverture de journée",`<div class="notice">Avant sa première opération, l’agent doit enregistrer les soldes disponibles au début de sa journée. Le marchand peut également ouvrir sa propre journée.</div><form id="dayStartForm2" class="form-grid" style="margin-top:13px"><div class="field"><label>Solde MTN</label><input name="mtn" type="number" min="0" value="${findWallet("MTN")?.balance||0}" required></div><div class="field"><label>Solde Moov</label><input name="moov" type="number" min="0" value="${findWallet("Moov")?.balance||0}" required></div><div class="field"><label>Solde Celtiis</label><input name="celtiis" type="number" min="0" value="${findWallet("Celtiis")?.balance||0}" required></div><div class="field"><label>Espèces en caisse</label><input name="cash" type="number" min="0" value="${findWallet("Espèces")?.balance||0}" required></div><div class="field full"><div class="actions"><button type="button" class="btn gray" onclick="closeModal()">Annuler</button><button class="btn">Commencer la journée</button></div></div></form>`);
- document.getElementById("dayStartForm2").onsubmit=e=>{e.preventDefault();const f=new FormData(e.target);[["MTN","mtn"],["Moov","moov"],["Celtiis","celtiis"],["Espèces","cash"]].forEach(([n,k])=>{const w=findWallet(n);if(w)w.balance=+f.get(k)||0});data.profile.dayStarted=true;data.profile.openingDate=isoNow();data.profile.openingBalances={MTN:+f.get("mtn")||0,Moov:+f.get("moov")||0,Celtiis:+f.get("celtiis")||0,Espèces:+f.get("cash")||0};save();closeModal();alert("Journée ouverte. Vous pouvez maintenant effectuer les opérations.");};
-}
-function getDay(){return data.profile.dayStarted?{open:true,openedAt:data.profile.openingDate,opening:data.profile.openingBalances}:null}
-function agentSubscriptionActive(){if(mpRole()!=="agent")return true;const a=getCurrentAgent();return !!(a&&a.status!=="inactive"&&a.subscription.status==="active"&&(!a.subscription.expiresAt||new Date(a.subscription.expiresAt)>new Date()))}
-function canAgentOperate(){return mpRole()!=="agent"||(agentSubscriptionActive()&&accountDayOpen())}
-function updateDayUI(){const el=document.getElementById("dayStatus");if(!el)return;const d=getDay();el.innerHTML=d&&d.open?"<strong>Journée ouverte</strong><br>Ouverte le "+new Date(d.openedAt).toLocaleString():"<strong>Journée fermée</strong><br>Ouvrez une journée pour commencer les opérations."}
-function closeDayEntry(){if(!data.profile.dayStarted){alert("Aucune journée ouverte.");return}data.profile.closingBalances=Object.fromEntries(data.wallets.map(w=>[w.name,w.balance]));data.profile.dayStarted=false;data.profile.closedAt=isoNow();save();updateDayUI();alert("Journée clôturée. L’historique reste consultable.")}
-function applyAgentOperationLock(){const allowed=canAgentOperate();document.querySelectorAll('[data-operation-action], #operations button[type="submit"], #newOperationBtn').forEach(b=>{if(isAgentRole(mpRole())){b.disabled=!allowed;b.title=!agentSubscriptionActive()?"Abonnement agent inactif":(!accountDayOpen()?"Ouvrez votre journée":"")}})}
-function configureAgentView(){const isAgent=isAgentRole(mpRole());const rb=document.getElementById("agentReturnBar");if(rb)rb.style.display=isAgent?"block":"none";document.querySelectorAll('button[data-page="agents"], #agents, #agentAccessRules').forEach(e=>e.style.display=isAgent?"none":"");document.querySelectorAll('[data-owner-only], .merchant-only').forEach(e=>e.style.display=isAgent?"none":"");updateDayUI();applyAgentOperationLock();showAgentOnlyProfileActions();}
-
-// --- Gestion explicite de la journée et des droits agent ---
-function moneyproCurrentRole(){
-  return localStorage.getItem("moneypro_role") || "merchant";
-}
-function moneyproAgentId(){
-  return localStorage.getItem("moneypro_agent_id") || "";
-}
-function dayKey(){
-  return "moneypro_day_"+(moneyproAgentId()||"merchant");
-}
+// Gestion de journée : l'état réel est conservé dans Supabase.
+function accountDayOpen(){ return !!data.profile?.dayStarted; }
 function getDay(){
-  try{return JSON.parse(localStorage.getItem(dayKey())||"null")}catch(e){return null}
+  if(!data.profile?.dayStarted) return null;
+  return {open:true, openedAt:data.profile.openingDate||null, opening:data.profile.openingBalances||{}};
 }
-function setDay(d){localStorage.setItem(dayKey(),JSON.stringify(d))}
+function openDayStart(){ return openDayEntry(); }
 function openDayEntry(){
   const d=getDay();
-  if(d && d.open) { alert("La journée est déjà ouverte."); return; }
-  const panel=document.getElementById("dayEntryPanel"); if(panel) panel.style.display="block";
-  const title=document.getElementById("dayEntryTitle"); if(title) title.textContent="Ouverture de journée";
+  if(d?.open){ alert("La journée est déjà ouverte."); return; }
+  const panel=document.getElementById("dayEntryPanel");
+  if(panel) panel.style.display="block";
+  const title=document.getElementById("dayEntryTitle");
+  if(title) title.textContent="Ouverture de journée";
+  const vals=data.wallets||[];
+  const value=n=>Number(vals.find(w=>w.name===n)?.balance||0);
+  const fields=[["openingMTN","MTN"],["openingMoov","Moov"],["openingCeltiis","Celtiis"],["openingCash","Espèces"]];
+  fields.forEach(([id,n])=>{const el=document.getElementById(id);if(el)el.value=value(n);});
 }
-function saveDayOpening(){
+async function saveDayOpening(){
   const vals={
-    MTN:Number(document.getElementById("openingMTN")?.value||0),
-    Moov:Number(document.getElementById("openingMoov")?.value||0),
-    Celtiis:Number(document.getElementById("openingCeltiis")?.value||0),
-    Espèces:Number(document.getElementById("openingCash")?.value||0)
+    mtn:Number(document.getElementById("openingMTN")?.value||0),
+    moov:Number(document.getElementById("openingMoov")?.value||0),
+    celtiis:Number(document.getElementById("openingCeltiis")?.value||0),
+    cash:Number(document.getElementById("openingCash")?.value||0)
   };
-  if(Object.values(vals).some(v=>!Number.isFinite(v)||v<0)){alert("Les soldes doivent être valides.");return}
-  setDay({open:true,openedAt:new Date().toISOString(),opening:vals});
-  localStorage.setItem("moneypro_day_open","1");
-  updateDayUI();
-  const panel=document.getElementById("dayEntryPanel"); if(panel) panel.style.display="none";
-  alert("Journée ouverte. Vous pouvez maintenant effectuer vos opérations.");
+  if(Object.values(vals).some(v=>!Number.isFinite(v)||v<0)){alert("Les soldes d'ouverture doivent être valides et positifs ou nuls.");return;}
+  try{
+    await mpOpenDayDb(vals);
+    await mpLoadFromSupabase();
+    const panel=document.getElementById("dayEntryPanel"); if(panel) panel.style.display="none";
+    renderAll(); updateDayUI();
+    alert("Journée ouverte. Vous pouvez maintenant effectuer les opérations.");
+  }catch(e){alert(mpDbError(e));}
 }
 function closeDayEntry(){
-  const d=getDay();
-  if(!d || !d.open){alert("Aucune journée ouverte.");return}
-  const wallets=(window.MoneyProState&&MoneyProState.wallets)||null;
-  d.closeRequestedAt=new Date().toISOString();
-  d.closing=wallets;
-  d.open=false;
-  d.closedAt=new Date().toISOString();
-  setDay(d);
-  localStorage.removeItem("moneypro_day_open");
-  updateDayUI();
-  alert("Journée clôturée. L'historique reste consultable.");
+  if(!data.profile?.dayStarted){alert("Aucune journée ouverte.");return;}
+  openDayClosingModal();
 }
 function updateDayUI(){
   const el=document.getElementById("dayStatus"); if(!el)return;
   const d=getDay();
-  el.innerHTML=d&&d.open
-    ? "<strong>Journée ouverte</strong><br>Ouverte le "+new Date(d.openedAt).toLocaleString()
+  el.innerHTML=d?.open
+    ? "<strong>Journée ouverte</strong><br>Ouverte le "+(d.openedAt?new Date(d.openedAt).toLocaleString():"—")
     : "<strong>Journée fermée</strong><br>Ouvrez une journée pour commencer les opérations.";
 }
 function agentSubscriptionActive(){
-  const role=moneyproCurrentRole();
-  if(!isAgentRole(role)) return true;
-  const s=data.subscription||{};
-  return s.status==="active" && (!s.expiresAt || new Date(s.expiresAt)>new Date());
+  const role=mpRole();
+  if(role!=="agent" && role!=="agent_independent") return true;
+  const a=getCurrentAgent();
+  const s=role==="agent_independent" ? (data.subscription||{}) : (a?.subscription||data.subscription||{});
+  return !!(s.status==="active" && (!s.expiresAt || new Date(s.expiresAt)>new Date()));
 }
 function canAgentOperate(){
-  if(!isAgentRole(moneyproCurrentRole())) return true;
-  return agentSubscriptionActive() && !!getDay()?.open;
+  return !isAgentRole(mpRole()) || (agentSubscriptionActive() && accountDayOpen());
 }
 function applyAgentOperationLock(){
   const allowed=canAgentOperate();
   document.querySelectorAll('[data-operation-action], #operations button[type="submit"], #newOperationBtn').forEach(b=>{
-    if(isAgentRole(moneyproCurrentRole())){
+    if(isAgentRole(mpRole())){
       b.disabled=!allowed;
-      b.title=!agentSubscriptionActive()?"Abonnement agent inactif":(!getDay()?.open?"Ouvrez votre journée":"");
+      b.title=!agentSubscriptionActive()?"Abonnement agent inactif":(!accountDayOpen()?"Ouvrez votre journée":"");
     }
   });
 }
 function configureAgentView(){
-  const isAgent=isAgentRole(moneyproCurrentRole());
-  const rb=document.getElementById("agentReturnBar"); if(rb) rb.style.display=isAgent?"block":"none";
+  const isAgent=isAgentRole(mpRole());
+  const rb=document.getElementById("agentReturnBar"); if(rb)rb.style.display=isAgent?"block":"none";
   document.querySelectorAll('button[data-page="agents"], #agents, #agentAccessRules').forEach(e=>e.style.display=isAgent?"none":"");
   document.querySelectorAll('[data-owner-only], .merchant-only').forEach(e=>e.style.display=isAgent?"none":"");
-  updateDayUI(); applyAgentOperationLock();
+  updateDayUI(); applyAgentOperationLock(); showAgentOnlyProfileActions();
 }
-document.addEventListener("DOMContentLoaded",()=>{updateDayUI();configureAgentView();});
-window.addEventListener("storage",()=>{updateDayUI();applyAgentOperationLock()});
 
-document.addEventListener("submit",function(e){
-  const form=e.target;
-  if(form && isAgentRole(moneyproCurrentRole()) && form.closest("#operations") && !canAgentOperate()){
-    e.preventDefault(); e.stopImmediatePropagation();
-    alert(!agentSubscriptionActive()?"Votre abonnement agent n'est pas actif. Vous pouvez consulter votre historique, mais pas effectuer d'opérations.":"Ouvrez votre journée avant d'effectuer une opération.");
-    return false;
-  }
-},true);
-
-function mpRole(){ return localStorage.getItem("moneypro_role") || "merchant"; }
-function isAgentRole(role){ return role==="agent" || role==="agent_independent"; }
-function showAgentOnlyProfileActions(){
- const isAgent=isAgentRole(mpRole());
- document.querySelectorAll(".merchant-agent-only").forEach(el=>el.style.display=isAgent?"inline-flex":"none");
-}
-function populateMerchantAgentSelector(){
- const wrap=document.getElementById("opTargetAgentWrap"),select=document.getElementById("opTargetAgent");if(!wrap||!select)return;
- const isMerchant=mpRole()==="merchant";wrap.style.display=isMerchant?"block":"none";if(!isMerchant)return;
- select.innerHTML='<option value="">Compte marchand</option>'+data.agents.filter(a=>a.status!=="inactive").map(a=>`<option value="${esc(a.id)}">${esc(a.name)}</option>`).join("");
-}
-function selectedOperationAccount(){const el=document.getElementById("opTargetAgent");return mpRole()==="merchant"&&el&&el.value?el.value:null;}
-function prepareOperationAgentField(){populateMerchantAgentSelector();showAgentOnlyProfileActions();}
-document.addEventListener("DOMContentLoaded",prepareOperationAgentField);
-
-/* ================================================================
-   MONEYPRO — COUCHE DE DONNÉES V8
-   Compatible avec le schéma MoneyPro actuel + migration SQL fournie.
-   ================================================================ */
 const MP_SUPABASE_URL = window.MONEYPRO_SUPABASE_URL || "https://dadqzjhruibpcgwrftvs.supabase.co";
 const MP_SUPABASE_ANON_KEY = window.MONEYPRO_SUPABASE_ANON_KEY || "sb_publishable_h_xd_C06XsatQ1DXwjzXIA_suOwP8qR";
 const MP_SUPABASE_CONFIGURED = !!(MP_SUPABASE_URL && MP_SUPABASE_ANON_KEY);
@@ -781,7 +727,7 @@ async function mpLoadFromSupabase(){
   const u=await mpUser(); if(!u)return false;
   const me=await mpProfile(u.id);
   const merchantId=me.role==="merchant"?me.id:(me.merchant_id||null);
-  const isIndependentAgent=me.role==="agent_independent" || (me.role==="agent"&&!merchantId);
+  const isIndependentAgent=me.role==="agent_independent";
 
   const walletQ=mpSupabase.from("wallets").select("*").eq("profile_id",u.id);
   const opQ=isIndependentAgent?mpSupabase.from("operations").select("*").eq("account_owner_id",u.id).order("created_at",{ascending:false}):mpSupabase.from("operations").select("*").eq("merchant_id",merchantId).order("created_at",{ascending:false});
@@ -797,6 +743,14 @@ async function mpLoadFromSupabase(){
 
   const agentRows=agentR.data||[];
   const agentIds=agentRows.map(a=>a.id);
+  let dayHistoryR;
+  if(me.role==="merchant"){
+    const ids=[u.id,...agentIds];
+    dayHistoryR=ids.length?await mpSupabase.from("business_days").select("*").in("profile_id",ids).eq("status","closed").order("closed_at",{ascending:false}).limit(100):{data:[],error:null};
+  }else{
+    dayHistoryR=await mpSupabase.from("business_days").select("*").eq("profile_id",u.id).eq("status","closed").order("closed_at",{ascending:false}).limit(30);
+  }
+  if(dayHistoryR.error)throw dayHistoryR.error;
   let agentWalletRows=[], agentDayRows=[];
   if(agentIds.length){
     const [ar,dr]=await Promise.all([
@@ -855,6 +809,8 @@ async function mpLoadFromSupabase(){
       },
       profile:{
         role:"agent",
+        account_type:"agent_attached",
+        merchant_id:a.merchant_id||merchantId,
         name:mpProfileName(a),
         shopName:merchantProfileRow?.shop_name||"",
         phone:a.phone||"",
@@ -872,6 +828,8 @@ async function mpLoadFromSupabase(){
   const ownSub=findSub(u.id,me.role==="agent"?"agent":"merchant")||{};
   const ownProfile={
     role:me.role,
+    account_type:me.account_type|| (me.role==="merchant"?"merchant":me.role==="agent_independent"?"agent_independent":"agent_attached"),
+    merchant_id:me.merchant_id||null,
     shopName:me.shop_name||merchantProfileRow?.shop_name||"",
     name:mpProfileName(me),
     phone:me.phone||"",
@@ -884,7 +842,7 @@ async function mpLoadFromSupabase(){
   };
   data.profile=ownProfile;
   data.wallets=mpWalletsFromRows(walletR.data||[]);
-  if(ownDay){localStorage.setItem(dayKey(),JSON.stringify({open:true,openedAt:ownDay.opened_at,opening:ownDay.opening_balances||{}}));}else{localStorage.removeItem(dayKey());}
+  data.dayHistory=(dayHistoryR.data||[]).map(d=>({id:d.id,openedAt:d.opened_at,closedAt:d.closed_at,openingBalances:d.opening_balances||{},theoreticalBalances:d.theoretical_balances||{},closingBalances:d.closing_balances||{},varianceBalances:d.variance_balances||{},totalVariance:Number(d.total_variance||0),note:d.closing_note||d.note||""}));
 
   const isAgentId=id=>agentRows.some(a=>a.id===id);
   data.operations=(opR.data||[]).map(o=>{
@@ -1031,10 +989,52 @@ async function mpOpenDayDb(f){
   });
   if(error)throw error;
 }
-async function mpCloseDayDb(){
-  const {error}=await mpSupabase.rpc("close_day");
+async function mpCloseDayDb(f){
+  const {data:result,error}=await mpSupabase.rpc("close_day",{
+    p_mtn:Number(f.mtn)||0,p_moov:Number(f.moov)||0,
+    p_celtiis:Number(f.celtiis)||0,p_cash:Number(f.cash)||0,
+    p_note:String(f.note||"").trim()||null
+  });
   if(error)throw error;
+  return result;
 }
+
+function openDayClosingModal(){
+  const vals={
+    MTN:Number(findWallet("MTN")?.balance||0),
+    Moov:Number(findWallet("Moov")?.balance||0),
+    Celtiis:Number(findWallet("Celtiis")?.balance||0),
+    Espèces:Number(findWallet("Espèces")?.balance||0)
+  };
+  openModal("Clôture de journée",`<div class="notice">Saisissez les montants réellement comptés/confirmés. MoneyPro comparera ces montants aux soldes théoriques calculés à partir de l'ouverture, des opérations, des dépenses et des transferts de commissions.</div>
+  <form id="dayClosingForm" class="form-grid" style="margin-top:13px">
+    <div class="field"><label>MTN réel</label><input name="mtn" type="number" min="0" step="1" placeholder="Montant réellement compté" required></div>
+    <div class="field"><label>Moov réel</label><input name="moov" type="number" min="0" step="1" placeholder="Montant réellement compté" required></div>
+    <div class="field"><label>Celtiis réel</label><input name="celtiis" type="number" min="0" step="1" placeholder="Montant réellement compté" required></div>
+    <div class="field"><label>Espèces réel</label><input name="cash" type="number" min="0" step="1" placeholder="Montant réellement compté" required></div>
+    <div class="field full"><label>Observation de clôture</label><textarea name="note" rows="3" placeholder="Facultatif : raison d'un écart, comptage, correction prévue…"></textarea></div>
+    <div class="field full"><div class="actions"><button type="button" class="btn gray" onclick="closeModal()">Annuler</button><button class="btn">Clôturer et enregistrer les écarts</button></div></div>
+  </form>`);
+  document.getElementById("dayClosingForm").onsubmit=async e=>{
+    e.preventDefault();
+    const f=new FormData(e.target);
+    try{
+      const result=await mpCloseDayDb(f);
+      await mpLoadFromSupabase();
+      closeModal();renderAll();updateDayUI();renderDayHistory(result);
+      const total=Number(result?.total_variance||0);
+      alert(total===0?"Journée clôturée. Aucun écart constaté.":`Journée clôturée. Écart total : ${money(total)}.`);
+    }catch(err){alert(mpDbError(err));}
+  };
+}
+function renderDayHistory(latest=null){
+ const panel=document.getElementById("dayVariancePanel"),table=document.getElementById("dayVarianceTable"),total=document.getElementById("dayVarianceTotal"),note=document.getElementById("dayVarianceNote"),history=document.getElementById("dayHistoryTable");
+ if(latest){const b=latest.variance_balances||latest.variance||{},labels=["MTN","Moov","Celtiis","Espèces"];const rows=labels.map(n=>`<tr><td>${n}</td><td>${money(latest.theoretical_balances?.[n]||0)}</td><td>${money(latest.closing_balances?.[n]||0)}</td><td class="${Number(b[n]||0)<0?'negative':Number(b[n]||0)>0?'positive':''}">${money(b[n]||0)}</td></tr>`).join("");panel.style.display="block";table.innerHTML=`<table class="table"><thead><tr><th>Portefeuille</th><th>Théorique</th><th>Réel</th><th>Écart</th></tr></thead><tbody>${rows}</tbody></table>`;total.textContent=money(latest.total_variance||0);note.textContent=latest.note||"Écart = solde réel − solde théorique.";}
+ const rows=(data.dayHistory||[]).map(d=>`<tr><td>${fmt(d.openedAt)}</td><td>${fmt(d.closedAt)}</td><td>${money(d.totalVariance)}</td><td><button class="btn secondary small" type="button" onclick='showDayHistoryDetail(${JSON.stringify(d).replace(/'/g,"&#39;")})'>Détails</button></td></tr>`).join("");
+ if(history)history.innerHTML=rows?`<table class="table"><thead><tr><th>Ouverture</th><th>Clôture</th><th>Écart total</th><th></th></tr></thead><tbody>${rows}</tbody></table>`:`<div class="empty">Aucune journée clôturée.</div>`;
+}
+function showDayHistoryDetail(d){const labels=["MTN","Moov","Celtiis","Espèces"];const rows=labels.map(n=>`<tr><td>${n}</td><td>${money(d.theoreticalBalances?.[n]||0)}</td><td>${money(d.closingBalances?.[n]||0)}</td><td class="${Number(d.varianceBalances?.[n]||0)<0?'negative':Number(d.varianceBalances?.[n]||0)>0?'positive':''}">${money(d.varianceBalances?.[n]||0)}</td></tr>`).join("");openModal("Détail de la clôture",`<div class="notice">Ouverture : ${fmt(d.openedAt)}<br>Clôture : ${fmt(d.closedAt)}</div><div class="table-wrap" style="margin-top:12px"><table class="table"><thead><tr><th>Portefeuille</th><th>Théorique</th><th>Réel</th><th>Écart</th></tr></thead><tbody>${rows}</tbody></table></div><div class="notice" style="margin-top:12px">Écart total : <b>${money(d.totalVariance)}</b>${d.note?`<br>Observation : ${esc(d.note)}`:""}</div>`);}
+
 async function mpDeactivateAgentDb(id){
   const {data:session}=await mpSupabase.auth.getSession();
   const token=session?.session?.access_token;
@@ -1096,7 +1096,10 @@ if(mpSupabase){
             full_name:suName.value.trim(),
             name:suName.value.trim(),
             shop_name:suShop.value.trim(),
-            phone
+            phone,
+            role:"merchant",
+            account_type:"merchant",
+            merchant_id:null
           }
         }
       });
@@ -1231,7 +1234,7 @@ if(mpSupabase){
 
   save=async function(){try{persistCurrentAccount();await mpSaveProfile();renderAll();}catch(e){console.error(e);alert(mpDbError(e));}};
   saveDayOpening=async function(){const f={mtn:openingMTN.value,moov:openingMoov.value,celtiis:openingCeltiis.value,cash:openingCash.value};try{await mpOpenDayDb(f);await mpLoadFromSupabase();renderAll();updateDayUI();alert("Journée ouverte.");}catch(e){alert(mpDbError(e));}};
-  closeDayEntry=async function(){try{await mpCloseDayDb();await mpLoadFromSupabase();renderAll();updateDayUI();alert("Journée clôturée.");}catch(e){alert(mpDbError(e));}};
+  closeDayEntry=function(){openDayClosingModal();};
   deactivateAgent=async function(id){if(confirm("Désactiver cet agent ? Son historique sera conservé.")){try{await mpDeactivateAgentDb(id);await mpLoadFromSupabase();renderAll();}catch(e){alert(mpDbError(e));}}};
   openAgent=function(){openModal("Créer un agent",`<form id="agentForm" class="form-grid"><div class="notice full">L’agent rattaché aura son propre compte, ses propres portefeuilles et un abonnement de 500 F CFA/mois. Vous pouvez créer autant d’agents rattachés que nécessaire.</div><div class="field"><label>Nom complet</label><input name="name" required></div><div class="field"><label>Téléphone</label><input name="phone" required></div><div class="field"><label>Email de connexion</label><input name="email" type="email" required></div><div class="actions full"><button type="button" class="btn gray" onclick="closeModal()">Annuler</button><button class="btn">Créer l’agent</button></div></form>`);document.getElementById("agentForm").onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);try{const r=await mpCreateAgentDb({name:String(f.get("name")).trim(),phone:String(f.get("phone")).trim(),email:String(f.get("email")).trim().toLowerCase()});await mpLoadFromSupabase();closeModal();openModal("Agent créé",`<div class="notice"><b>${esc(r.name||f.get("name"))}</b> a été créé.</div><div class="stat-row"><span>Email</span><b>${esc(r.email||f.get("email"))}</b></div>${r.temporary_password?`<div class="stat-row"><span>Mot de passe temporaire</span><b>${esc(r.temporary_password)}</b></div>`:""}<div class="notice warning" style="margin-top:12px">L’agent devra modifier son mot de passe lors de sa première connexion.</div><div class="actions"><button class="btn" onclick="closeModal()">Fermer</button></div>`);}catch(err){alert(mpDbError(err));}}};
 
