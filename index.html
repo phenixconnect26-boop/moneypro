@@ -92,9 +92,8 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:
     <button data-page="inventory">📦 Inventaire</button>
     <button data-page="agents">👥 Agents</button>
     <button data-page="reports">📈 Rapports</button>
-    <button data-page="subscription" class="commercial-only">💳 Abonnement</button>
-    <button data-page="settings" class="commercial-only">⚙️ Paramètres</button>
-    <button data-page="admin" id="adminNav" class="admin-only" style="display:none">🛡️ Administration</button>
+    <button data-page="subscription">💳 Abonnement</button>
+    <button data-page="settings">⚙️ Paramètres</button>
   </nav>
   <div class="side-bottom"><a class="btn secondary" style="width:100%;display:block;text-align:center;text-decoration:none;margin-bottom:8px" href="https://wa.me/22953023080" target="_blank" rel="noopener noreferrer">💬 Support</a><button class="btn secondary" style="width:100%" onclick="logout()">Déconnexion</button></div>
 </aside>
@@ -189,24 +188,10 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:
 
 <section id="subscription" class="page">
 <div class="grid sections">
-<div class="subscription"><div class="muted" style="font-size:11px" id="subLabel">ABONNEMENT</div><div style="font-size:28px;font-weight:900;margin:8px 0" id="subPrice">2 000 F / mois</div><div id="subState"></div><div class="muted" id="subExpires" style="margin-top:8px"></div><div class="muted" id="subRemaining" style="margin-top:4px"></div><button id="subAction" class="btn" style="margin-top:16px;background:#fff;color:#155eef" onclick="startSubscription(subscriptionKindForRole(mpRole()))">S'abonner via FedaPay</button></div>
+<div class="subscription"><div class="muted" style="font-size:11px" id="subLabel">ABONNEMENT</div><div style="font-size:28px;font-weight:900;margin:8px 0" id="subPrice">2 000 F / mois</div><div id="subState"></div><div class="muted" id="subExpires" style="margin-top:8px"></div><div class="muted" id="subRemaining" style="margin-top:4px"></div><button id="subAction" class="btn" style="margin-top:16px;background:#fff;color:#155eef" onclick="startSubscription('merchant')">S'abonner via FedaPay</button></div>
 <div class="card"><h2>Votre tarification</h2><div id="planMerchant" class="plan" style="display:none"><h3>Marchand</h3><div class="plan-price">1 000 F</div><small>Premier abonnement après l'essai</small><div style="margin-top:9px;font-weight:700">Puis 2 000 F / mois</div></div><div id="planAgentAttached" class="plan" style="display:none;margin-top:12px"><h3>Agent rattaché</h3><div class="plan-price">500 F</div><small>Abonnement personnel de l'agent rattaché, par mois</small></div><div id="planAgentIndependent" class="plan" style="display:none;margin-top:12px"><h3>Agent indépendant</h3><div class="plan-price">1 000 F</div><small>Abonnement personnel, autonome et sans marchand de rattachement</small></div></div>
 </div>
 <div class="card" style="margin-top:15px"><h2>Historique des paiements</h2><div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Compte</th><th>Montant</th><th>Statut</th><th>Référence</th></tr></thead><tbody id="paymentsTable"></tbody></table></div></div>
-</section>
-
-<section id="admin" class="page">
-<div class="grid cards">
-  <div class="card"><div class="metric">Comptes commerciaux</div><div class="value" id="adminAccountsCount">0</div><div class="sub">Marchands + agents</div></div>
-  <div class="card"><div class="metric">Marchands</div><div class="value" id="adminMerchantsCount">0</div><div class="sub">Comptes marchands</div></div>
-  <div class="card"><div class="metric">Agents</div><div class="value" id="adminAgentsCount">0</div><div class="sub">Indépendants + rattachés</div></div>
-  <div class="card"><div class="metric">Administrateurs</div><div class="value" id="adminAdminsCount">0</div><div class="sub">Administration interne</div></div>
-</div>
-<div class="card" style="margin-top:15px">
-  <div class="section-title"><h2>Administration interne MoneyPro</h2><span class="role-pill">ADMIN</span></div>
-  <p class="muted">Cet espace est réservé à l'administration interne de l'application. Il n'est pas un type de compte commercial et ne possède aucun abonnement.</p>
-  <div class="table-wrap"><table class="table"><thead><tr><th>Nom</th><th>Email</th><th>Type</th><th>Statut</th></tr></thead><tbody id="adminAccountsTable"></tbody></table></div>
-</div>
 </section>
 
 <section id="settings" class="page">
@@ -321,12 +306,6 @@ function closeModal(){modal.classList.remove("open")}
 /* OPÉRATIONS */
 function mpRole(){
   return data.profile?.role || null;
-}
-function isAdminRole(role){
-  return role === "admin" || role === "administrator";
-}
-function isCommercialRole(role){
-  return role === "merchant" || role === "agent_independent" || role === "agent";
 }
 function isAgentRole(role){
   return role === "agent" || role === "agent_independent";
@@ -483,7 +462,6 @@ function subscriptionKindForRole(role){
 }
 function startSubscription(kind,agentId=null){
   const role=mpRole();
-  if(isAdminRole(role)){ alert("L’administration interne MoneyPro ne possède aucun abonnement commercial."); return; }
   let targetKind=null, price=0, first=false, subjectName=data.profile?.name||"Compte";
 
   if(role==="merchant"){
@@ -524,7 +502,30 @@ function startSubscription(kind,agentId=null){
     :(targetKind==="agent_independent"?"Compte autonome — 1 000 F CFA/mois":"Compte rattaché au marchand — 500 F CFA/mois");
   openModal("Abonnement via FedaPay",`<div class="plan active"><h3>${title}</h3><div class="plan-price">${money(price)} / mois</div><small>${esc(subjectName)} — ${esc(description)}</small></div><div class="notice" style="margin-top:13px">Le paiement est lié exclusivement au compte concerné. L'abonnement ne devient actif qu'après confirmation serveur de FedaPay.</div><div class="actions"><button class="btn gray" onclick="closeModal()">Annuler</button><button class="btn" onclick="simulatePayment('${targetKind}','${agentId||""}',${price})">Paiement réel via FedaPay</button></div>`);
 }
-function simulatePayment(){ alert("Les paiements de démonstration sont désactivés. Utilisez FedaPay."); }
+async function simulatePayment(kind,agentId=null,price=null){
+  try{
+    const accountId=(kind==="agent_attached" ? agentId : await mpUserId());
+    if(!accountId) throw new Error("Compte concerné introuvable.");
+    const role=mpRole();
+    const accountType=kind==="agent_independent"?"agent_independent":kind==="agent_attached"?"agent_attached":"merchant";
+    const {data:sessionData,error:sessionError}=await mpSupabase.auth.getSession();
+    if(sessionError)throw sessionError;
+    const token=sessionData?.session?.access_token;
+    if(!token)throw new Error("Session Supabase absente. Reconnectez-vous puis réessayez.");
+    const r=await fetch(MP_SUPABASE_URL+"/functions/v1/fedapay-create-payment",{
+      method:"POST",
+      headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},
+      body:JSON.stringify({account_id:accountId,account_type:accountType,callback_url:location.origin+location.pathname+"?fedapay_return=1"})
+    });
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(j.error||`Erreur FedaPay (${r.status})`);
+    if(!j.payment_url)throw new Error("FedaPay n’a pas fourni de lien de paiement.");
+    window.location.href=j.payment_url;
+  }catch(e){
+    console.error("MoneyPro FedaPay:",e);
+    alert(e?.message||String(e)||"Impossible de démarrer le paiement FedaPay.");
+  }
+}
 
 /* REPORTS */
 function renderReports(){
@@ -569,7 +570,6 @@ function roleDisplayLabel(role,accountType,merchantId){
  if(role==="merchant") return "Marchand";
  if(role==="agent_independent") return "Agent indépendant";
  if(role==="agent") return merchantId?"Agent rattaché":"Agent rattaché";
- if(isAdminRole(role)) return "Administration interne";
  return "";
 }
 function subscriptionDisplay(s){
@@ -623,12 +623,7 @@ function renderDashboard(){
  renderSubscriptionSummary("dashboard",s,Number(s.price|| (isAgent?(a?.merchantId?500:1000):(!s.everSubscribed?1000:2000))),isAgent);
 }
 function renderSubscription(){
- const role=mpRole();
- if(isAdminRole(role)){
-   const section=document.getElementById("subscription"); if(section) section.classList.remove("active");
-   return;
- }
- const isAgent=isAgentRole(role),a=getCurrentAgent(),s=isAgent?(a?.subscription||data.subscription||{status:"inactive",everSubscribed:false,expiresAt:null}):data.subscription||{status:"inactive",everSubscribed:false,expiresAt:null};
+ const role=mpRole(),isAgent=isAgentRole(role),a=getCurrentAgent(),s=isAgent?(a?.subscription||data.subscription||{status:"inactive",everSubscribed:false,expiresAt:null}):data.subscription||{status:"inactive",everSubscribed:false,expiresAt:null};
  const label=document.getElementById("subLabel");
  if(label) label.textContent=role==="merchant"?"ABONNEMENT MARCHAND":role==="agent_independent"?"ABONNEMENT AGENT INDÉPENDANT":"ABONNEMENT AGENT RATTACHÉ";
  const first=!s.everSubscribed;
@@ -640,7 +635,7 @@ function renderSubscription(){
 
 /* GLOBAL */
 function renderAll(){
- renderCommissionTransfers();loadSettings();renderDashboard();renderOperations();renderWallets();renderExpenses();renderInventory();renderAgents();renderReports();renderSubscription();renderDayHistory();renderAdmin()}
+ renderCommissionTransfers();loadSettings();renderDashboard();renderOperations();renderWallets();renderExpenses();renderInventory();renderAgents();renderReports();renderSubscription();renderDayHistory()}
 document.getElementById("authScreen").classList.remove("hidden");
 
 function getMerchantPhone(){ return String(data.profile.merchantContactPhone||"").trim(); }
@@ -717,25 +712,18 @@ function applyAgentOperationLock(){
 }
 function configureAgentView(){
   const role=mpRole();
-  const admin=isAdminRole(role);
   const isAgent=isAgentRole(role);
   const isIndependent=role === "agent_independent";
   const isAttached=role === "agent";
 
-  document.querySelectorAll('.admin-only').forEach(e=>e.style.display=admin?"":"none");
-  document.querySelectorAll('.commercial-only, [data-owner-only], .merchant-only').forEach(e=>e.style.display=admin?"none":(isAgent?"none":""));
-  document.querySelectorAll('button[data-page="agents"], #agents, #agentAccessRules').forEach(e=>e.style.display=(admin||isAgent)?"none":"");
+  /* Un agent ne doit jamais voir la gestion des agents rattachés. */
+  document.querySelectorAll('button[data-page="agents"], #agents, #agentAccessRules').forEach(e=>e.style.display=isAgent?"none":"");
+  document.querySelectorAll('[data-owner-only], .merchant-only').forEach(e=>e.style.display=isAgent?"none":"");
   if(isAgent){
     document.querySelectorAll('button[data-page="inventory"], #inventory').forEach(e=>e.style.display="none");
   }
-  if(admin){
-    document.querySelectorAll('[data-page="dashboard"],[data-page="operations"],[data-page="wallets"],[data-page="expenses"],[data-page="inventory"],[data-page="agents"],[data-page="reports"],[data-page="subscription"],[data-page="settings"], #newOperationBtn').forEach(e=>e.style.display="none");
-    const title=document.getElementById("pageTitle"); if(title) title.textContent="Administration interne";
-    renderAdmin();
-    showPage("admin");
-    return;
-  }
 
+  /* Tarification stricte : une seule offre est visible selon le rôle Supabase. */
   const planMerchant=document.getElementById("planMerchant");
   const planAttached=document.getElementById("planAgentAttached");
   const planIndependent=document.getElementById("planAgentIndependent");
@@ -746,27 +734,9 @@ function configureAgentView(){
 
   const dashLabel=document.querySelector("#dashboard .subscription .muted");
   if(dashLabel) dashLabel.textContent=isIndependent?"ABONNEMENT AGENT INDÉPENDANT":isAttached?"ABONNEMENT AGENT RATTACHÉ":"ABONNEMENT MARCHAND";
-  const subAction=document.getElementById("subAction");
-  if(subAction){
-    const kind=subscriptionKindForRole(role);
-    subAction.onclick=kind?()=>startSubscription(kind,role==="agent"?(getCurrentAgent()?.id||null):null):null;
-  }
+
   updateDayUI(); applyAgentOperationLock(); showAgentOnlyProfileActions();
 }
-
-function renderAdmin(){
-  if(!isAdminRole(mpRole())) return;
-  const rows=Array.isArray(data.adminAccounts)?data.adminAccounts:[];
-  const merchants=rows.filter(r=>r.role==="merchant").length;
-  const agents=rows.filter(r=>r.role==="agent"||r.role==="agent_independent").length;
-  const admins=rows.filter(r=>isAdminRole(r.role)).length;
-  const commercial=merchants+agents;
-  const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=String(v);};
-  set("adminAccountsCount",commercial); set("adminMerchantsCount",merchants); set("adminAgentsCount",agents); set("adminAdminsCount",admins);
-  const t=document.getElementById("adminAccountsTable");
-  if(t)t.innerHTML=rows.length?rows.map(r=>`<tr><td><b>${esc(r.name||"—")}</b></td><td>${esc(r.email||"—")}</td><td><span class="role-pill">${esc(roleDisplayLabel(r.role,r.account_type,r.merchant_id)||r.role||"—")}</span></td><td>${r.is_active===false?'<span class="badge red">Désactivé</span>':'<span class="badge green">Actif</span>'}</td></tr>`).join(""): '<tr><td colspan="4" class="empty">Aucun compte visible.</td></tr>';
-}
-
 
 const MP_SUPABASE_URL = window.MONEYPRO_SUPABASE_URL || "https://dadqzjhruibpcgwrftvs.supabase.co";
 const MP_SUPABASE_ANON_KEY = window.MONEYPRO_SUPABASE_ANON_KEY || "sb_publishable_h_xd_C06XsatQ1DXwjzXIA_suOwP8qR";
@@ -1412,51 +1382,6 @@ if(mpSupabase){
   deactivateAgent=async function(id){if(confirm("Désactiver cet agent ? Son historique sera conservé.")){try{await mpDeactivateAgentDb(id);await mpLoadFromSupabase();renderAll();}catch(e){alert(mpDbError(e));}}};
   openAgent=function(){openModal("Créer un agent",`<form id="agentForm" class="form-grid"><div class="notice full">L’agent rattaché aura son propre compte, ses propres portefeuilles et un abonnement de 500 F CFA/mois. Vous pouvez créer autant d’agents rattachés que nécessaire.</div><div class="field"><label>Nom complet</label><input name="name" required></div><div class="field"><label>Téléphone</label><input name="phone" required></div><div class="field"><label>Email de connexion</label><input name="email" type="email" required></div><div class="actions full"><button type="button" class="btn gray" onclick="closeModal()">Annuler</button><button class="btn">Créer l’agent</button></div></form>`);document.getElementById("agentForm").onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);try{const r=await mpCreateAgentDb({name:String(f.get("name")).trim(),phone:String(f.get("phone")).trim(),email:String(f.get("email")).trim().toLowerCase()});await mpLoadFromSupabase();closeModal();openModal("Agent créé",`<div class="notice"><b>${esc(r.name||f.get("name"))}</b> a été créé.</div><div class="stat-row"><span>Email</span><b>${esc(r.email||f.get("email"))}</b></div>${r.temporary_password?`<div class="stat-row"><span>Mot de passe temporaire</span><b>${esc(r.temporary_password)}</b></div>`:""}<div class="notice warning" style="margin-top:12px">L’agent devra modifier son mot de passe lors de sa première connexion.</div><div class="actions"><button class="btn" onclick="closeModal()">Fermer</button></div>`);}catch(err){alert(mpDbError(err));}}};
 
-  /* ================================================================
-     FEDAPAY V8 — paiement d'abonnement réel via Edge Function
-     La clé secrète FedaPay ne quitte jamais Supabase.
-     ================================================================ */
-  startSubscription=async function(kind,agentId=null){
-    try{
-      const isAgent=kind==="agent";
-      const accountId=isAgent?(agentId||await mpUserId()):await mpUserId();
-      if(!accountId)return;
-      const account=(isAgent?data.agents.find(a=>a.id===agentId):data.profile)||{};
-      const first=!isAgent && !data.subscription.everSubscribed;
-      const amount=isAgent?(account.merchantId?500:1000):(first?1000:2000);
-      openModal("Paiement sécurisé FedaPay",`<div class="plan active"><h3>${isAgent?"Abonnement agent":"Abonnement marchand"}</h3><div class="plan-price">${money(amount)} / mois</div><small>${isAgent?"Agent : "+esc(account.name||""):(first?"Premier abonnement":"Renouvellement")}</small></div><div class="notice" style="margin-top:13px">Vous allez être redirigé vers la page de paiement sécurisée FedaPay. L’abonnement ne sera activé qu’après confirmation serveur.</div><div class="actions"><button class="btn gray" onclick="closeModal()">Annuler</button><button class="btn" id="fedapayContinue">Continuer vers FedaPay</button></div>`);
-      document.getElementById("fedapayContinue").onclick=async()=>{
-        const btn=document.getElementById("fedapayContinue");
-        try{
-          if(btn){btn.disabled=true;btn.textContent="Connexion à FedaPay…";}
-          const {data:sessionData,error:sessionError}=await mpSupabase.auth.getSession();
-          if(sessionError)throw sessionError;
-          const token=sessionData?.session?.access_token;
-          if(!token)throw new Error("Session Supabase absente. Reconnectez-vous puis réessayez.");
-          const r=await fetch(MP_SUPABASE_URL+"/functions/v1/fedapay-create-payment",{
-            method:"POST",
-            headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},
-            body:JSON.stringify({account_id:accountId,account_type:isAgent?"agent":"merchant",callback_url:location.origin+location.pathname+"?fedapay_return=1"})
-          });
-          const j=await r.json().catch(()=>({}));
-          if(!r.ok)throw new Error(j.error||`Erreur FedaPay (${r.status})`);
-          if(!j.payment_url)throw new Error("FedaPay n’a pas fourni de lien de paiement.");
-          window.location.href=j.payment_url;
-        }catch(e){
-          console.error("MoneyPro FedaPay:",e);
-          alert(e?.message||String(e)||"Impossible de démarrer le paiement FedaPay.");
-          if(btn){btn.disabled=false;btn.textContent="Continuer vers FedaPay";}
-        }
-      };
-    }catch(e){alert(mpDbError(e));}
-  };
-  simulatePayment=function(){startSubscription("merchant");};
-  document.addEventListener("DOMContentLoaded",async()=>{
-    const params=new URLSearchParams(location.search);
-    if(params.get("fedapay_return")){
-      setTimeout(async()=>{try{await mpLoadFromSupabase();renderAll();const st=params.get("status");alert(st==="approved"?"Paiement reçu. L’activation est confirmée par FedaPay et le serveur.":"Paiement terminé ou en attente de confirmation. Actualisez votre espace dans quelques secondes.");}catch(e){console.error(e);}},600);
-    }
-  });
 
 
 }
