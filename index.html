@@ -215,8 +215,9 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:
  - Le statut d'abonnement sera calculé côté serveur.
 */
 
-/* État applicatif : aucune donnée métier n’est persistée dans le navigateur.
-   Les données de ce cache mémoire sont toujours chargées depuis Supabase. */
+/* Supabase reste la source de vérité. Une copie persistante de la dernière
+   synchronisation est conservée localement pour un démarrage instantané et
+   la continuité hors connexion. */
 let data={
   profile:null, merchantProfile:null, merchantWallets:[], wallets:[],
   operations:[], expenses:[], products:[], agents:[], payments:[],
@@ -269,14 +270,8 @@ function authView(v){
 }
 /* AUTHENTIFICATION : les comptes et identifiants sont gérés exclusivement par Supabase. */
 function showApp(){
-  if(!mpDbReady && !data.profile){
-    document.getElementById("app").classList.add("hidden");
-    document.getElementById("authScreen").classList.remove("hidden");
-    authView("login");
-    document.body.classList.remove("booting");
-    msg("Aucune donnée disponible. Connectez-vous avec Internet au moins une fois.");
-    return;
-  }
+  /* Une session Supabase valide suffit à garder l'application ouverte.
+     Les données locales servent immédiatement l'interface pendant la synchronisation. */
   document.getElementById("authScreen").classList.add("hidden");
   document.getElementById("app").classList.remove("hidden");
   document.body.classList.remove("booting");
@@ -721,12 +716,7 @@ async function mpLoadFromSupabase(){
     mpDbReady=false;
     return false;
   }
-  /* Ne jamais conserver des données métier provenant d'une ancienne session en mémoire. */
-  data={
-    profile:null, merchantProfile:null, merchantWallets:[], wallets:[],
-    operations:[], expenses:[], products:[], agents:[], payments:[],
-    commissionTransfers:[], dayHistory:[], subscription:null, merchantId:null
-  };
+  /* Conserver l'affichage courant pendant toute la synchronisation. */
   const u=await mpUser(); if(!u)return false;
   const me=await mpProfile(u.id);
   const merchantId=me.role==="merchant"?me.id:(me.merchant_id||null);
@@ -1212,7 +1202,60 @@ if(mpSupabase){
     }catch(err){msg(mpDbError(err));}
   };
 
-  mpSupabase.auth.onAuthStateChange(async(event,session)=>{
+  let mpSyncInFlight=null;
+  let mpRealtimeChannel=null;
+  let mpCurrentUserId=null;
+  let mpSyncTimer=null;
+
+  async function mpSyncNow(userId){
+    if(!userId || !navigator.onLine || !mpSupabase)return;
+    if(mpSyncInFlight)return mpSyncInFlight;
+    mpSyncInFlight=(async()=>{
+      try{
+        await mpLoadFromSupabase();
+        if(mpCurrentUserId===userId)showApp();
+      }catch(e){
+        console.warn("MoneyPro synchronisation:",e);
+        mpDbReady=false;
+      }finally{mpSyncInFlight=null;}
+    })();
+    return mpSyncInFlight;
+  }
+  function scheduleRealtimeSync(){
+    clearTimeout(mpSyncTimer);
+    mpSyncTimer=setTimeout(()=>{if(mpCurrentUserId)mpSyncNow(mpCurrentUserId);},350);
+  }
+  function setupRealtime(){
+    if(!mpSupabase || mpRealtimeChannel)return;
+    mpRealtimeChannel=mpSupabase.channel("moneypro-live-sync")
+      .on("postgres_changes",{event:"*",schema:"public",table:"wallets"},scheduleRealtimeSync)
+      .on("postgres_changes",{event:"*",schema:"public",table:"operations"},scheduleRealtimeSync)
+      .on("postgres_changes",{event:"*",schema:"public",table:"expenses"},scheduleRealtimeSync)
+      .on("postgres_changes",{event:"*",schema:"public",table:"inventory_products"},scheduleRealtimeSync)
+      .on("postgres_changes",{event:"*",schema:"public",table:"profiles"},scheduleRealtimeSync)
+      .on("postgres_changes",{event:"*",schema:"public",table:"subscriptions"},scheduleRealtimeSync)
+      .on("postgres_changes",{event:"*",schema:"public",table:"subscription_payments"},scheduleRealtimeSync)
+      .on("postgres_changes",{event:"*",schema:"public",table:"commission_transfers"},scheduleRealtimeSync)
+      .on("postgres_changes",{event:"*",schema:"public",table:"business_days"},scheduleRealtimeSync)
+      .subscribe();
+  }
+  async function mpOpenSession(session){
+    const u=session?.user;
+    if(!u){
+      mpCurrentUserId=null;
+      document.getElementById("app").classList.add("hidden");
+      document.getElementById("authScreen").classList.remove("hidden");
+      authView("login");
+      document.body.classList.remove("booting");
+      return;
+    }
+    mpCurrentUserId=u.id;
+    loadLocalCache(u.id);
+    showApp();
+    setupRealtime();
+    if(navigator.onLine)mpSyncNow(u.id);
+  }
+  mpSupabase.auth.onAuthStateChange((event,session)=>{
     if(event==="PASSWORD_RECOVERY"){
       document.getElementById("app").classList.add("hidden");
       document.getElementById("authScreen").classList.remove("hidden");
@@ -1220,16 +1263,31 @@ if(mpSupabase){
       document.body.classList.remove("booting");
       return;
     }
-    if(session && (event==="SIGNED_IN"||event==="INITIAL_SESSION")){
-      try{await mpLoadFromSupabase();showApp();}catch(e){console.error(e);}
-    }
+    if(event==="SIGNED_IN" || event==="INITIAL_SESSION")mpOpenSession(session);
     if(event==="SIGNED_OUT"){
+      mpCurrentUserId=null;
+      if(mpRealtimeChannel){mpSupabase.removeChannel(mpRealtimeChannel);mpRealtimeChannel=null;}
+      clearRuntimeData();
       document.getElementById("app").classList.add("hidden");
       document.getElementById("authScreen").classList.remove("hidden");
       authView("login");
       document.body.classList.remove("booting");
     }
   });
+  document.addEventListener("DOMContentLoaded",async()=>{
+    try{
+      const {data:sessionData}=await mpSupabase.auth.getSession();
+      await mpOpenSession(sessionData?.session||null);
+    }catch(e){
+      console.error("MoneyPro démarrage:",e);
+      document.getElementById("app").classList.add("hidden");
+      document.getElementById("authScreen").classList.remove("hidden");
+      authView("login");
+      document.body.classList.remove("booting");
+    }
+  });
+  window.addEventListener("online",()=>{if(mpCurrentUserId)mpSyncNow(mpCurrentUserId);});
+  window.addEventListener("offline",()=>{mpDbReady=false;});
 
   const _oldLogout=logout;
   logout=async function(){
@@ -1303,54 +1361,7 @@ if(mpSupabase){
     }
   });
 
-  document.addEventListener("DOMContentLoaded",async()=>{
-  try{
-    const u=await mpUser();
-    if(!u){
-      document.getElementById("app").classList.add("hidden");
-      document.getElementById("authScreen").classList.remove("hidden");
-      authView("login");
-      document.body.classList.remove("booting");
-      return;
-    }
-    if(navigator.onLine){
-      try{ await mpLoadFromSupabase(); showApp(); }
-      catch(e){
-        console.error(e);
-        mpDbReady=false;
-        if(loadLocalCache(u.id)) showApp(); else showApp();
-      }
-    }else if(loadLocalCache(u.id)){
-      mpDbReady=false;
-      showApp();
-    }else{
-      showApp();
-    }
-  }catch(e){
-    mpDbReady=false;
-    console.error(e);
-    document.getElementById("app").classList.add("hidden");
-    document.getElementById("authScreen").classList.remove("hidden");
-    authView("login");
-    document.body.classList.remove("booting");
-  }
-});
 
-window.addEventListener("offline",async()=>{
-  mpDbReady=false;
-  const u=await mpUser().catch(()=>null);
-  if(u && loadLocalCache(u.id)) showApp();
-});
-window.addEventListener("online",async()=>{
-  const u=await mpUser().catch(()=>null);
-  if(!u)return;
-  try{ await mpLoadFromSupabase(); showApp(); }
-  catch(e){
-    console.error(e);
-    mpDbReady=false;
-    if(loadLocalCache(u.id)) showApp();
-  }
-});
 }
 </script>
 </body>
