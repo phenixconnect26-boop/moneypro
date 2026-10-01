@@ -95,7 +95,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:
     <button data-page="subscription">💳 Abonnement</button>
     <button data-page="settings">⚙️ Paramètres</button>
   </nav>
-  <div class="side-bottom"><button class="btn secondary" style="width:100%" onclick="logout()">Déconnexion</button></div>
+  <div class="side-bottom"><a class="btn secondary" style="width:100%;display:block;text-align:center;text-decoration:none;margin-bottom:8px" href="https://wa.me/22953023080" target="_blank" rel="noopener noreferrer">💬 Support</a><button class="btn secondary" style="width:100%" onclick="logout()">Déconnexion</button></div>
 </aside>
 
 <main class="main">
@@ -130,7 +130,6 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:
   <div class="section-title"><h3>Historique des clôtures</h3></div>
   <div id="dayHistoryTable" class="table-wrap"><div class="empty">Aucune journée clôturée.</div></div>
 </div>
-<div id="agentReturnBar" class="notice" style="display:none;margin-top:10px"><b>Mode agent</b> — vous consultez uniquement le compte de cet agent. <button class="btn small" onclick="switchToMerchant();showApp()">Retour au compte marchand</button></div>
 <div class="day-actions">
 <button type="button" onclick="openDayEntry()">Ouvrir la journée</button>
 <button type="button" onclick="closeDayEntry()">Clôturer la journée</button>
@@ -249,20 +248,6 @@ if(!data.merchantProfile)data.merchantProfile=clone(data.profile||initialData.pr
 if(!data.merchantWallets)data.merchantWallets=clone(data.wallets||initialData.wallets);
 if(!Array.isArray(data.agents))data.agents=[];
 data.agents.forEach(a=>{a.wallets=a.wallets||clone(initialData.wallets);a.profile=a.profile||{role:"agent",account_type:"agent_attached",merchant_id:null,name:a.name,shopName:data.merchantProfile.shopName,phone:a.phone,email:a.email,merchantContactPhone:data.merchantProfile.phone||"",dayStarted:false,openingDate:null};a.status=a.status||"active";a.subscription=a.subscription||{status:"inactive",expiresAt:null,everSubscribed:false,price:1000};});
-function persistCurrentAccount(){
- const role=localStorage.getItem("moneypro_role")||"merchant",aid=localStorage.getItem("moneypro_agent_id")||"";
- if(role==="agent"&&aid){const a=data.agents.find(x=>x.id===aid);if(a){a.profile=clone(data.profile);a.wallets=clone(data.wallets);}}
- else {data.merchantProfile=clone(data.profile);data.merchantWallets=clone(data.wallets);}
-}
-const _save=save;
-save=function(){persistCurrentAccount();_save();};
-function restoreSessionAccount(){
- const role=localStorage.getItem("moneypro_role")||"merchant";
- if(role==="agent"){const a=data.agents.find(x=>x.id===localStorage.getItem("moneypro_agent_id"));if(a){data.profile=clone(a.profile);data.wallets=clone(a.wallets||initialData.wallets);return;}}
- data.profile=clone(data.merchantProfile||initialData.profile);data.wallets=clone(data.merchantWallets||initialData.wallets);
-}
-restoreSessionAccount();
-
 function clone(o){return JSON.parse(JSON.stringify(o))}
 function load(){try{return JSON.parse(localStorage.getItem(STORAGE))||clone(initialData)}catch(e){return clone(initialData)}}
 function save(){localStorage.setItem(STORAGE,JSON.stringify(data));renderAll()}
@@ -298,7 +283,7 @@ document.getElementById("signupForm").onsubmit=e=>{
  data.subscription={status:"inactive",everSubscribed:false,price:1000,startedAt:null,expiresAt:null};
  data.merchantProfile=clone(data.profile);data.merchantWallets=clone(data.wallets);
  localStorage.setItem(STORAGE,JSON.stringify(data));
- localStorage.setItem("moneypro_role","merchant");localStorage.removeItem("moneypro_agent_id");localStorage.setItem("moneypro_session","1");
+ localStorage.setItem("moneypro_session","1");
  msg("Compte créé. Vérifiez votre adresse email avant de vous connecter.",true);
  setTimeout(showApp,500);
 };
@@ -307,18 +292,18 @@ document.getElementById("loginForm").onsubmit=e=>{
  const email=String(liEmail.value||"").trim().toLowerCase(), pass=String(liPass.value||"");
  if(!localStorage.getItem(STORAGE))return msg("Aucun compte local. Utilisez l'inscription.");
  if(email===String(data.profile.email||"").trim().toLowerCase()){
-   switchToMerchant(); localStorage.setItem("moneypro_session","1"); showApp(); return;
+   localStorage.setItem("moneypro_session","1"); showApp(); return;
  }
  const a=data.agents.find(x=>String(x.email||"").trim().toLowerCase()===email);
  if(a){
    if(pass!==String(a.password||""))return msg("Identifiants agent incorrects.");
-   switchToAgent(a.id); localStorage.setItem("moneypro_session","1"); showApp(); return;
+   localStorage.setItem("moneypro_session","1"); showApp(); return;
  }
  msg("Compte introuvable ou identifiants incorrects.");
 };
 document.getElementById("forgotForm").onsubmit=e=>{e.preventDefault();msg("Un lien sécurisé de réinitialisation vous sera envoyé automatiquement.",true)};
-function showApp(){if(!mpSupabase)restoreSessionAccount();document.getElementById("authScreen").classList.add("hidden");document.getElementById("app").classList.remove("hidden");document.body.classList.remove("booting");loadSettings();renderAll();configureAgentView();populateMerchantAgentSelector()}
-function logout(){persistCurrentAccount();switchToMerchant();localStorage.removeItem("moneypro_session");document.getElementById("app").classList.add("hidden");document.getElementById("authScreen").classList.remove("hidden");document.body.classList.remove("booting");authView("login")}
+function showApp(){document.getElementById("authScreen").classList.add("hidden");document.getElementById("app").classList.remove("hidden");document.body.classList.remove("booting");loadSettings();renderAll();configureAgentView();populateMerchantAgentSelector()}
+function logout(){localStorage.removeItem("moneypro_session");document.getElementById("app").classList.add("hidden");document.getElementById("authScreen").classList.remove("hidden");document.body.classList.remove("booting");authView("login")}
 function resetAll(){if(confirm("Effacer toutes les données locales ?")){localStorage.removeItem(STORAGE);location.reload()}}
 
 /* NAV */
@@ -337,8 +322,15 @@ function isAgentRole(role){
   return role === "agent" || role === "agent_independent";
 }
 function getCurrentAgent(){
- const id=localStorage.getItem("moneypro_agent_id")||"";
- return data.agents.find(a=>a.id===id)||null;
+ const role=mpRole();
+ if(role!=="agent") return null;
+ return {
+   id:data.profile?.id||null,
+   name:data.profile?.name||"Agent",
+   profile:data.profile||{},
+   wallets:data.wallets||[],
+   subscription:data.subscription||{}
+ };
 }
 function getOperationContext(){
  const role=mpRole();
@@ -413,7 +405,7 @@ function deleteOperation(id){
 function renderOperations(){
  ensureDayStart();
  let q=(document.getElementById("opSearch")?.value||"").toLowerCase(),ft=document.getElementById("opFilter")?.value||"",fn=document.getElementById("netFilter")?.value||"";
- const role=mpRole(),aid=localStorage.getItem("moneypro_agent_id")||"";
+ const role=mpRole(),aid=data.profile?.id||"";
  let rows=data.operations.filter(o=>!isAgentRole(role)||o.agentId===aid).filter(o=>(!ft||o.type===ft)&&(!fn||o.operator===fn)&&(!q||JSON.stringify(o).toLowerCase().includes(q)));
  opsTable.innerHTML=rows.length?rows.map(o=>`<tr><td>${fmt(o.date)}</td><td><b>${esc(o.transactionId||"—")}</b></td><td><span class="badge">${esc(o.type)}</span></td><td>${esc(o.operator)}</td><td>${esc(o.client||"—")}</td><td>${money(o.amount)}</td><td class="positive">${money(o.fee)}</td><td>${esc(o.agent)}</td><td>${esc(o.note||"—")}</td><td><button class="btn danger small" onclick="deleteOperation('${o.id}')">Supprimer</button></td></tr>`).join(""):`<tr><td colspan="10" class="empty">Aucune opération.</td></tr>`;
 }
@@ -468,29 +460,10 @@ function renderAgents(){
  agentsTable.innerHTML=data.agents.length?data.agents.map(a=>{
    const sv=subscriptionDisplay(a.subscription||{});
    const subText=sv.key==="trial"?sv.date:(sv.key==="active"?sv.date:"Expiré");
-   return `<tr><td><b>${esc(a.name)}</b><br><small>${esc(a.email)}</small></td><td>${esc(a.phone)}</td><td><span class="role-pill">Agent rattaché</span></td><td>${a.status!=="inactive"?'<span class="badge green">Actif</span>':'<span class="badge red">Désactivé</span>'}</td><td><span class="badge ${sv.badge}">${esc(subText)}</span></td><td><button class="btn secondary small" onclick="startSubscription('agent','${a.id}')">Abonnement</button> <button class="btn small" onclick="switchToAgent('${a.id}')">Ouvrir</button> <button class="btn danger small" onclick="deactivateAgent('${a.id}')">Désactiver</button></td></tr>`;
+   return `<tr><td><b>${esc(a.name)}</b><br><small>${esc(a.email)}</small></td><td>${esc(a.phone)}</td><td><span class="role-pill">Agent rattaché</span></td><td>${a.status!=="inactive"?'<span class="badge green">Actif</span>':'<span class="badge red">Désactivé</span>'}</td><td><span class="badge ${sv.badge}">${esc(subText)}</span></td><td><button class="btn secondary small" onclick="startSubscription('agent','${a.id}')">Abonnement</button> <button class="btn danger small" onclick="deactivateAgent('${a.id}')">Désactiver</button></td></tr>`;
  }).join(""):`<tr><td colspan="6" class="empty">Aucun agent rattaché.</td></tr>`;
 }
 function deactivateAgent(id){const a=data.agents.find(x=>x.id===id);if(!a)return;if(confirm("Désactiver cet agent ? Son historique sera conservé.")){a.status="inactive";save()}}
-function switchToAgent(id){
- const a=data.agents.find(x=>x.id===id);if(!a)return;
- persistCurrentAccount();
- localStorage.setItem("moneypro_role","agent");localStorage.setItem("moneypro_agent_id",a.id);localStorage.setItem("moneypro_agent_subscription",JSON.stringify({active:a.subscription.status==="active",expiresAt:a.subscription.expiresAt}));
- data.profile=clone(a.profile);data.wallets=clone(a.wallets||newAgentWallets());
- showApp();showPage("dashboard");
-}
-function switchToMerchant(){
- persistCurrentAccount();
- const mp=data.merchantProfile||initialData.profile,mw=data.merchantWallets||initialData.wallets;
- data.profile=clone(mp);data.wallets=clone(mw);
- localStorage.setItem("moneypro_role","merchant");localStorage.removeItem("moneypro_agent_id");localStorage.removeItem("moneypro_agent_subscription");
-}
-function persistCurrentAccount(){
- const role=mpRole(),aid=localStorage.getItem("moneypro_agent_id")||"";
- if(role==="agent"&&aid){const a=data.agents.find(x=>x.id===aid);if(a){a.profile=clone(data.profile);a.wallets=clone(data.wallets);a.profile.dayStarted=!!data.profile.dayStarted;}}
- else {data.merchantProfile=clone(data.profile);data.merchantWallets=clone(data.wallets)}
-}
-
 /* SUBSCRIPTIONS — LOCAL SIMULATION, SERA REMPLACÉE PAR SUPABASE + FEDAPAY */
 function startSubscription(kind,agentId=null){
  let isAgent=kind==="agent",agent=isAgent?data.agents.find(a=>a.id===agentId):null;
@@ -534,7 +507,7 @@ settingsForm.onsubmit=e=>{e.preventDefault();data.profile.shopName=shopName.valu
 
 /* DASHBOARD + SUB */
 function visibleOperations(){
- const role=mpRole(),aid=localStorage.getItem("moneypro_agent_id")||"";
+ const role=mpRole(),aid=data.profile?.id||"";
  return isAgentRole(role)?data.operations.filter(o=>o.agentId===aid):data.operations;
 }
 function roleDisplayLabel(role,accountType,merchantId){
@@ -606,8 +579,7 @@ function renderSubscription(){
 /* GLOBAL */
 function renderAll(){
  renderCommissionTransfers();loadSettings();renderDashboard();renderOperations();renderWallets();renderExpenses();renderInventory();renderAgents();renderReports();renderSubscription();renderDayHistory()}
-if(localStorage.getItem("moneypro_session")==="1")showApp();
-else document.getElementById("authScreen").classList.remove("hidden");
+document.getElementById("authScreen").classList.remove("hidden");
 
 function getMerchantPhone(){ return String(data.profile.merchantContactPhone||"").trim(); }
 function saveMerchantPhone(){ const el=document.getElementById("merchantContactPhone"); if(!el) return; data.profile.merchantContactPhone=el.value.trim(); save(); }
@@ -685,10 +657,9 @@ function configureAgentView(){
   const role=mpRole();
   const isAgent=isAgentRole(role);
   const isIndependent=role === "agent_independent";
-  const rb=document.getElementById("agentReturnBar"); if(rb)rb.style.display=isAgent?"none":"none";
   document.querySelectorAll('button[data-page="agents"], #agents, #agentAccessRules').forEach(e=>e.style.display=isAgent?"none":"");
   document.querySelectorAll('[data-owner-only], .merchant-only').forEach(e=>e.style.display=isAgent?"none":"");
-  if(isIndependent){
+  if(isAgent){
     document.querySelectorAll('button[data-page="inventory"], #inventory').forEach(e=>e.style.display="none");
   }
   updateDayUI(); applyAgentOperationLock(); showAgentOnlyProfileActions();
@@ -838,6 +809,7 @@ async function mpLoadFromSupabase(){
 
   const ownSub=findSub(u.id,me.role==="agent"?"agent":"merchant")||{};
   const ownProfile={
+    id:u.id,
     role:me.role,
     account_type:me.account_type|| (me.role==="merchant"?"merchant":me.role==="agent_independent"?"agent_independent":"agent_attached"),
     merchant_id:me.merchant_id||null,
@@ -924,10 +896,6 @@ async function mpLoadFromSupabase(){
   }).filter(x=>me.role==="merchant"||x.agentId===u.id);
 
   data.merchantId=merchantId;
-  localStorage.setItem("moneypro_role",me.role);
-  if(me.role==="agent")localStorage.setItem("moneypro_agent_id",me.id);
-  else localStorage.removeItem("moneypro_agent_id");
-  restoreSessionAccount();
   mpDbReady=true;
   return true;
 }
@@ -1223,8 +1191,6 @@ if(mpSupabase){
   const _oldLogout=logout;
   logout=async function(){
     try{await mpSupabase.auth.signOut();}catch(e){console.error(e)}
-    localStorage.removeItem("moneypro_role");
-    localStorage.removeItem("moneypro_agent_id");
     localStorage.removeItem("moneypro_session");
   };
   /* Opérations: le solde et l'écriture sont gérés atomiquement par PostgreSQL. */
@@ -1243,7 +1209,7 @@ if(mpSupabase){
   openProduct=function(){openModal("Nouveau produit",`<form id="productForm" class="form-grid"><div class="field"><label>Produit</label><input name="name" required></div><div class="field"><label>Quantité</label><input name="qty" type="number" min="0" value="0"></div><div class="field"><label>Seuil</label><input name="threshold" type="number" min="0" value="5"></div><div class="field"><label>Prix achat</label><input name="buy" type="number" min="0"></div><div class="field"><label>Prix vente</label><input name="sell" type="number" min="0"></div><div class="full actions"><button type="button" class="btn gray" onclick="closeModal()">Annuler</button><button class="btn">Enregistrer</button></div></form>`);document.getElementById("productForm").onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target),x={name:f.get("name"),qty:Number(f.get("qty"))||0,threshold:Number(f.get("threshold"))||0,buy:Number(f.get("buy"))||0,sell:Number(f.get("sell"))||0};try{await mpSaveProductLocal(x);await mpLoadFromSupabase();closeModal();renderAll();}catch(err){alert(mpDbError(err));}}};
   deleteProduct=async function(id){if(confirm("Supprimer ce produit ?")){try{await mpDeleteProductDb(id);await mpLoadFromSupabase();renderAll();}catch(e){alert(mpDbError(e));}}};
 
-  save=async function(){try{persistCurrentAccount();await mpSaveProfile();renderAll();}catch(e){console.error(e);alert(mpDbError(e));}};
+  save=async function(){try{await mpSaveProfile();renderAll();}catch(e){console.error(e);alert(mpDbError(e));}};
   saveDayOpening=async function(){const f={mtn:openingMTN.value,moov:openingMoov.value,celtiis:openingCeltiis.value,cash:openingCash.value};try{await mpOpenDayDb(f);await mpLoadFromSupabase();renderAll();updateDayUI();alert("Journée ouverte.");}catch(e){alert(mpDbError(e));}};
   closeDayEntry=function(){openDayClosingModal();};
   deactivateAgent=async function(id){if(confirm("Désactiver cet agent ? Son historique sera conservé.")){try{await mpDeactivateAgentDb(id);await mpLoadFromSupabase();renderAll();}catch(e){alert(mpDbError(e));}}};
