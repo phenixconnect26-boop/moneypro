@@ -115,7 +115,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:
     <div class="card"><div class="section-title"><h2>Dernières opérations</h2><button class="btn secondary small" onclick="showPage('operations')">Tout voir</button></div><div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Type</th><th>Compte</th><th>Montant</th><th>Commission</th></tr></thead><tbody id="recentOps"></tbody></table></div></div>
     <div class="card"><div class="section-title"><h2>Portefeuilles</h2><button class="btn secondary small" onclick="showPage('wallets')">Détails</button></div><div id="dashWallets" class="list-grid"></div></div>
   </div>
-  <div class="subscription" style="margin-top:15px"><div class="muted" style="font-size:11px">ABONNEMENT MARCHAND</div><div style="font-size:21px;font-weight:850;margin:5px 0" id="dashSubStatus"></div><div class="muted" id="dashSubDate"></div></div>
+  <div class="subscription" style="margin-top:15px"><div class="muted" style="font-size:11px">ABONNEMENT</div><div style="font-size:21px;font-weight:850;margin:5px 0" id="dashSubStatus"></div><div class="muted" id="dashSubDate"></div></div>
 </section>
 
 <section id="dayManagement" class="section">
@@ -189,7 +189,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:
 <section id="subscription" class="page">
 <div class="grid sections">
 <div class="subscription"><div class="muted" style="font-size:11px" id="subLabel">ABONNEMENT</div><div style="font-size:28px;font-weight:900;margin:8px 0" id="subPrice">2 000 F / mois</div><div id="subState"></div><div class="muted" id="subExpires" style="margin-top:8px"></div><div class="muted" id="subRemaining" style="margin-top:4px"></div><button id="subAction" class="btn" style="margin-top:16px;background:#fff;color:#155eef" onclick="startSubscription('merchant')">S'abonner via FedaPay</button></div>
-<div class="card"><h2>Votre tarification</h2><div id="planMerchant" class="plan" style="display:none"><h3>Marchand</h3><div class="plan-price">1 000 F</div><small>Premier abonnement après l'essai</small><div style="margin-top:9px;font-weight:700">Puis 2 000 F / mois</div></div><div id="planAgentAttached" class="plan" style="display:none;margin-top:12px"><h3>Agent rattaché</h3><div class="plan-price">500 F</div><small>Abonnement personnel de l'agent rattaché, par mois</small></div><div id="planAgentIndependent" class="plan" style="display:none;margin-top:12px"><h3>Agent indépendant</h3><div class="plan-price">1 000 F</div><small>Abonnement personnel, autonome et sans marchand de rattachement</small></div></div>
+<div class="card"><h2>Votre tarification</h2><div id="planMerchant" class="plan" style="display:none"><h3>Marchand</h3><div class="plan-price">1 000 F</div><small>Essai gratuit de 3 jours non renouvelable. Puis 1 000 F CFA le premier mois, puis 2 000 F CFA/mois dès le deuxième.</small><div style="margin-top:9px;font-weight:700">Puis 2 000 F / mois</div></div><div id="planAgentAttached" class="plan" style="display:none;margin-top:12px"><h3>Agent rattaché</h3><div class="plan-price">500 F</div><small>500 F CFA/mois, abonnement unique. Aucun essai gratuit.</small></div><div id="planAgentIndependent" class="plan" style="display:none;margin-top:12px"><h3>Agent indépendant</h3><div class="plan-price">1 000 F</div><small>Essai gratuit de 3 jours non renouvelable, puis 1 000 F CFA/mois dès le premier mois payant.</small></div></div>
 </div>
 <div class="card" style="margin-top:15px"><h2>Historique des paiements</h2><div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Compte</th><th>Montant</th><th>Statut</th><th>Référence</th></tr></thead><tbody id="paymentsTable"></tbody></table></div></div>
 </section>
@@ -441,7 +441,7 @@ function openAgent(){
  document.getElementById("agentForm").onsubmit=e=>{
   e.preventDefault();let f=new FormData(e.target),email=String(f.get("email")||"").trim().toLowerCase();
   if(data.agents.some(a=>String(a.email||"").toLowerCase()===email)||String(data.profile.email||"").toLowerCase()===email)return alert("Cette adresse email est déjà utilisée.");
-  const temp=generateTempPassword(),id=uid(),agent={id,name:f.get("name").trim(),phone:f.get("phone").trim(),email,password:temp,status:"active",merchantId:"local-merchant",merchantPhone:data.profile.phone||data.profile.merchantContactPhone||"",subscription:{status:"inactive",expiresAt:null,everSubscribed:false,price:1000},profile:{role:"agent",name:f.get("name").trim(),shopName:data.profile.shopName,phone:f.get("phone").trim(),email,merchantContactPhone:data.profile.phone||data.profile.merchantContactPhone||"",dayStarted:false,openingDate:null},wallets:newAgentWallets(),createdAt:isoNow()};
+  const temp=generateTempPassword(),id=uid(),agent={id,name:f.get("name").trim(),phone:f.get("phone").trim(),email,password:temp,status:"active",merchantId:"local-merchant",merchantPhone:data.profile.phone||data.profile.merchantContactPhone||"",subscription:{status:"inactive",expiresAt:null,everSubscribed:false,price:500},profile:{role:"agent",name:f.get("name").trim(),shopName:data.profile.shopName,phone:f.get("phone").trim(),email,merchantContactPhone:data.profile.phone||data.profile.merchantContactPhone||"",dayStarted:false,openingDate:null},wallets:newAgentWallets(),createdAt:isoNow()};
   data.agents.push(agent);save();closeModal();openModal("Agent créé",`<div class="notice"><b>${esc(agent.name)}</b> a été créé.</div><div class="stat-row"><span>Email de connexion</span><b>${esc(agent.email)}</b></div><div class="stat-row"><span>Mot de passe temporaire</span><b>${esc(temp)}</b></div><div class="notice warning" style="margin-top:12px">Transmettez ces identifiants à l’agent. Le compte est sécurisé et l’agent devra modifier son mot de passe lors de sa première connexion.</div><div class="actions"><button class="btn" onclick="closeModal()">Fermer</button></div>`);
  };
 }
@@ -449,10 +449,10 @@ function renderAgents(){
  agentsTable.innerHTML=data.agents.length?data.agents.map(a=>{
    const sv=subscriptionDisplay(a.subscription||{});
    const subText=sv.key==="trial"?sv.date:(sv.key==="active"?sv.date:"Expiré");
-   return `<tr><td><b>${esc(a.name)}</b><br><small>${esc(a.email)}</small></td><td>${esc(a.phone)}</td><td><span class="role-pill">Agent rattaché</span></td><td>${a.status!=="inactive"?'<span class="badge green">Actif</span>':'<span class="badge red">Désactivé</span>'}</td><td><span class="badge ${sv.badge}">${esc(subText)}</span></td><td><button class="btn secondary small" onclick="startSubscription('agent','${a.id}')">Abonnement</button> <button class="btn danger small" onclick="deactivateAgent('${a.id}')">Désactiver</button></td></tr>`;
+   return `<tr><td><b>${esc(a.name)}</b><br><small>${esc(a.email)}</small></td><td>${esc(a.phone)}</td><td><span class="role-pill">Agent rattaché</span></td><td>${a.status!=="inactive"?'<span class="badge green">Actif</span>':'<span class="badge red">Désactivé</span>'}</td><td><span class="badge ${sv.badge}">${esc(subText)}</span></td><td><button class="btn secondary small" onclick="startSubscription('agent','${a.id}')">Abonnement</button> ${a.status!=="inactive"?`<button class="btn danger small" onclick="deactivateAgent('${a.id}')">Désactiver</button>`:`<button class="btn secondary small" onclick="activateAgent('${a.id}')">Activer</button>`}</td></tr>`;
  }).join(""):`<tr><td colspan="6" class="empty">Aucun agent rattaché.</td></tr>`;
 }
-function deactivateAgent(id){const a=data.agents.find(x=>x.id===id);if(!a)return;if(confirm("Désactiver cet agent ? Son historique sera conservé.")){a.status="inactive";save()}}
+function deactivateAgent(id){const a=data.agents.find(x=>x.id===id);if(!a)return;if(mpRole()!=="merchant"){alert("Seul un compte marchand peut gérer l’activation des agents rattachés.");return;}if(confirm("Désactiver cet agent ? Son historique sera conservé.")){a.status="inactive";save()}}
 /* ABONNEMENTS — règles strictes par type de compte */
 function subscriptionKindForRole(role){
   if(role==="merchant") return "merchant";
@@ -462,34 +462,35 @@ function subscriptionKindForRole(role){
 }
 function startSubscription(kind,agentId=null){
   const role=mpRole();
-  let targetKind=null, price=0, first=false, subjectName=data.profile?.name||"Compte";
+  let targetKind=null, price=0, subjectName=data.profile?.name||"Compte";
 
   if(role==="merchant"){
-    /* Le marchand peut payer son propre abonnement ou ouvrir l'écran
-       d'abonnement d'un agent rattaché depuis sa liste d'agents. */
     if(kind==="merchant"){
-      const s=data.subscription||{everSubscribed:false};
-      first=!s.everSubscribed; price=first?1000:2000; targetKind="merchant";
+      const s=data.subscription||{};
+      targetKind="merchant";
+      price=s.everSubscribed?2000:1000;
       subjectName=data.profile?.name||"Marchand";
     }else if(kind==="agent" || kind==="agent_attached"){
       const agent=data.agents.find(a=>a.id===agentId);
       if(!agent){alert("Agent rattaché introuvable.");return;}
-      first=!agent.subscription?.everSubscribed; price=500; targetKind="agent_attached";
-      subjectName=agent.name||"Agent";
+      targetKind="agent_attached";
+      price=500;
+      subjectName=agent.name||"Agent rattaché";
       agentId=agent.id;
     }else{
       alert("Offre d'abonnement non autorisée pour ce compte.");return;
     }
   }else if(role==="agent_independent"){
-    if(kind!=="agent_independent"){alert("Un agent indépendant ne peut souscrire que l'abonnement agent indépendant.");return;}
-    const s=data.subscription||{everSubscribed:false};
-    first=!s.everSubscribed; price=1000; targetKind="agent_independent";
+    if(kind!=="agent_independent"){alert("Un agent indépendant ne peut souscrire qu'à l'abonnement agent indépendant.");return;}
+    targetKind="agent_independent";
+    price=1000;
     subjectName=data.profile?.name||"Agent indépendant";
   }else if(role==="agent"){
-    if(kind!=="agent_attached" && kind!=="agent"){alert("Un agent rattaché ne peut souscrire que l'abonnement agent rattaché.");return;}
+    if(kind!=="agent_attached" && kind!=="agent"){alert("Un agent rattaché ne peut souscrire qu'à l'abonnement agent rattaché.");return;}
     const agent=getCurrentAgent();
-    if(!agent || !agent.id){alert("Compte agent rattaché introuvable.");return;}
-    first=!agent.subscription?.everSubscribed; price=500; targetKind="agent_attached";
+    if(!agent?.id){alert("Compte agent rattaché introuvable.");return;}
+    targetKind="agent_attached";
+    price=500;
     subjectName=agent.name||"Agent rattaché";
     agentId=agent.id;
   }else{
@@ -498,10 +499,11 @@ function startSubscription(kind,agentId=null){
 
   const title=targetKind==="merchant"?"Abonnement marchand":targetKind==="agent_independent"?"Abonnement agent indépendant":"Abonnement agent rattaché";
   const description=targetKind==="merchant"
-    ?(first?"Premier abonnement après l'essai de 3 jours":"Renouvellement à 2 000 F CFA/mois")
-    :(targetKind==="agent_independent"?"Compte autonome — 1 000 F CFA/mois":"Compte rattaché au marchand — 500 F CFA/mois");
+    ?((data.subscription?.everSubscribed)?"Après le premier mois : 2 000 F CFA/mois":"Essai gratuit de 3 jours non renouvelable, puis 1 000 F CFA le premier mois")
+    :(targetKind==="agent_independent"?"Essai gratuit de 3 jours non renouvelable, puis 1 000 F CFA/mois":"500 F CFA/mois — aucun essai gratuit");
   openModal("Abonnement via FedaPay",`<div class="plan active"><h3>${title}</h3><div class="plan-price">${money(price)} / mois</div><small>${esc(subjectName)} — ${esc(description)}</small></div><div class="notice" style="margin-top:13px">Le paiement est lié exclusivement au compte concerné. L'abonnement ne devient actif qu'après confirmation serveur de FedaPay.</div><div class="actions"><button class="btn gray" onclick="closeModal()">Annuler</button><button class="btn" onclick="simulatePayment('${targetKind}','${agentId||""}',${price})">Paiement réel via FedaPay</button></div>`);
 }
+
 async function simulatePayment(kind,agentId=null,price=null){
   try{
     const accountId=(kind==="agent_attached" ? agentId : await mpUserId());
@@ -885,7 +887,7 @@ async function mpLoadFromSupabase(){
     };
   });
 
-  const ownSub=findSub(u.id,me.role==="agent"?"agent":"merchant")||{};
+  const ownSub=findSub(u.id,me.role==="agent"?"agent":me.role==="agent_independent"?"agent_independent":"merchant")||{};
   const ownProfile={
     id:u.id,
     role:me.role,
@@ -1105,6 +1107,12 @@ async function mpDeactivateAgentDb(id){
   const j=await r.json().catch(()=>({}));
   if(!r.ok)throw new Error(j.error||"Désactivation de l'agent impossible.");
   return j;
+}
+async function mpSetAgentStatusDb(id,active){
+  if(mpRole()!=="merchant")throw new Error("Seul le marchand peut activer ou désactiver un agent.");
+  const merchantId=await mpUserId();
+  const {error}=await mpSupabase.from("profiles").update({is_active:!!active,updated_at:new Date().toISOString()}).eq("id",id).eq("merchant_id",merchantId).eq("role","agent");
+  if(error)throw error;
 }
 async function mpCreateAgentDb(payload){
   const {data:session}=await mpSupabase.auth.getSession();
@@ -1379,8 +1387,9 @@ if(mpSupabase){
   save=async function(){try{await mpSaveProfile();renderAll();}catch(e){console.error(e);alert(mpDbError(e));}};
   saveDayOpening=async function(){const f={mtn:openingMTN.value,moov:openingMoov.value,celtiis:openingCeltiis.value,cash:openingCash.value};try{await mpOpenDayDb(f);await mpLoadFromSupabase();renderAll();updateDayUI();alert("Journée ouverte.");}catch(e){alert(mpDbError(e));}};
   closeDayEntry=function(){openDayClosingModal();};
-  deactivateAgent=async function(id){if(confirm("Désactiver cet agent ? Son historique sera conservé.")){try{await mpDeactivateAgentDb(id);await mpLoadFromSupabase();renderAll();}catch(e){alert(mpDbError(e));}}};
-  openAgent=function(){openModal("Créer un agent",`<form id="agentForm" class="form-grid"><div class="notice full">L’agent rattaché aura son propre compte, ses propres portefeuilles et un abonnement de 500 F CFA/mois. Vous pouvez créer autant d’agents rattachés que nécessaire.</div><div class="field"><label>Nom complet</label><input name="name" required></div><div class="field"><label>Téléphone</label><input name="phone" required></div><div class="field"><label>Email de connexion</label><input name="email" type="email" required></div><div class="actions full"><button type="button" class="btn gray" onclick="closeModal()">Annuler</button><button class="btn">Créer l’agent</button></div></form>`);document.getElementById("agentForm").onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);try{const r=await mpCreateAgentDb({name:String(f.get("name")).trim(),phone:String(f.get("phone")).trim(),email:String(f.get("email")).trim().toLowerCase()});await mpLoadFromSupabase();closeModal();openModal("Agent créé",`<div class="notice"><b>${esc(r.name||f.get("name"))}</b> a été créé.</div><div class="stat-row"><span>Email</span><b>${esc(r.email||f.get("email"))}</b></div>${r.temporary_password?`<div class="stat-row"><span>Mot de passe temporaire</span><b>${esc(r.temporary_password)}</b></div>`:""}<div class="notice warning" style="margin-top:12px">L’agent devra modifier son mot de passe lors de sa première connexion.</div><div class="actions"><button class="btn" onclick="closeModal()">Fermer</button></div>`);}catch(err){alert(mpDbError(err));}}};
+  deactivateAgent=async function(id){if(mpRole()!=="merchant"){alert("Seul le marchand peut désactiver un agent.");return;}if(confirm("Désactiver cet agent ? Son historique sera conservé.")){try{await mpDeactivateAgentDb(id);await mpLoadFromSupabase();renderAll();}catch(e){alert(mpDbError(e));}}};
+  activateAgent=async function(id){if(mpRole()!=="merchant"){alert("Seul le marchand peut activer un agent.");return;}if(confirm("Activer cet agent ?")){try{await mpSetAgentStatusDb(id,true);await mpLoadFromSupabase();renderAll();}catch(e){alert(mpDbError(e));}}};
+  openAgent=function(){if(mpRole()!=="merchant"){alert("Seul un compte marchand peut créer des agents rattachés.");return;}openModal("Créer un agent",`<form id="agentForm" class="form-grid"><div class="notice full">L’agent rattaché aura son propre compte, ses propres portefeuilles et un abonnement de 500 F CFA/mois. Vous pouvez créer autant d’agents rattachés que nécessaire.</div><div class="field"><label>Nom complet</label><input name="name" required></div><div class="field"><label>Téléphone</label><input name="phone" required></div><div class="field"><label>Email de connexion</label><input name="email" type="email" required></div><div class="actions full"><button type="button" class="btn gray" onclick="closeModal()">Annuler</button><button class="btn">Créer l’agent</button></div></form>`);document.getElementById("agentForm").onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);try{const r=await mpCreateAgentDb({name:String(f.get("name")).trim(),phone:String(f.get("phone")).trim(),email:String(f.get("email")).trim().toLowerCase()});await mpLoadFromSupabase();closeModal();openModal("Agent créé",`<div class="notice"><b>${esc(r.name||f.get("name"))}</b> a été créé.</div><div class="stat-row"><span>Email</span><b>${esc(r.email||f.get("email"))}</b></div>${r.temporary_password?`<div class="stat-row"><span>Mot de passe temporaire</span><b>${esc(r.temporary_password)}</b></div>`:""}<div class="notice warning" style="margin-top:12px">L’agent devra modifier son mot de passe lors de sa première connexion.</div><div class="actions"><button class="btn" onclick="closeModal()">Fermer</button></div>`);}catch(err){alert(mpDbError(err));}}};
 
 
 
