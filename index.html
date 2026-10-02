@@ -426,7 +426,8 @@ function getOperationContext(){
 function findWalletIn(wallets,name){return (wallets||[]).find(w=>w.name===name)}
 function openOperation(){
  const role=mpRole();
- if(isAgentRole(role) && !agentSubscriptionActive()){alert("Votre abonnement agent n'est pas actif. Vous pouvez consulter votre historique, mais pas effectuer d'opérations.");return;}
+ if(!requireWriteAccess("la création d'opérations"))return;
+ if(isAgentRole(role) && !agentSubscriptionActive()){alert("Votre abonnement agent n'est pas actif.");return;}
  if(isAgentRole(role) && !getDay()?.open){openDayStart();return;}
  const options=role==="merchant"?data.agents.map(a=>`<option value="${esc(a.id)}">${esc(a.name)}</option>`).join(""):"";
  openModal("Nouvelle opération",`
@@ -609,16 +610,40 @@ function subscriptionDisplay(s){
  const now=new Date();
  const expiry=s?.expiresAt?new Date(s.expiresAt):null;
  const validExpiry=expiry&&!Number.isNaN(expiry.getTime());
- const active=s?.status==="active" && (!validExpiry || expiry>now);
- const trial=active && !s?.everSubscribed && validExpiry;
- const expired=validExpiry && expiry<=now;
+ const paid=!!s?.everSubscribed;
+ const future=validExpiry && expiry>now;
+ const active=s?.status==="active" && (!validExpiry || future);
+ // L'essai est séparé de l'abonnement payant : s'il existe une date d'essai future
+ // et qu'aucun abonnement payant n'a encore été souscrit, il reste valable même si
+ // le statut de l'abonnement payant n'est pas encore "active". Il n'est jamais
+ // recréé ou prolongé par le navigateur.
+ const trial=!paid && future && s?.status!=="expired";
+ const expiredTrial=!paid && validExpiry && expiry<=now;
+ const expired=expiredTrial || (validExpiry && expiry<=now) || s?.status==="expired" || s?.status==="pending" || !s?.status || s?.status==="inactive";
  if(trial){
    const ms=Math.max(0,expiry-now); const days=Math.max(0,Math.ceil(ms/86400000));
-   return {key:"trial",label:"Essai",badge:"orange",date:"Essai + "+days+" "+(days===1?"jour":"jours"),remaining:"",active:false};
+   return {key:"trial",label:"Essai",badge:"orange",date:"Essai + "+days+" "+(days===1?"jour":"jours"),remaining:"",active:true,canWrite:true,trial:true,trialUsed:false};
  }
- if(active) return {key:"active",label:"Actif",badge:"green",date:validExpiry?"Actif jusqu'au "+fmt(s.expiresAt):"Actif",remaining:"",active:true};
- if(expired || s?.status==="expired" || s?.status==="pending" || !s?.status) return {key:"expired",label:"Expiré",badge:"red",date:"Expiré",remaining:"",active:false};
- return {key:"expired",label:"Expiré",badge:"red",date:"Expiré",remaining:"",active:false};
+ if(active && paid) return {key:"active",label:"Actif",badge:"green",date:validExpiry?"Actif jusqu'au "+fmt(s.expiresAt):"Actif",remaining:"",active:true,canWrite:true,trial:false,trialUsed:true};
+ if(expired) return {key:"expired",label:"Expiré",badge:"red",date:"Expiré",remaining:"Lecture seule — abonnement/essai expiré",active:false,canWrite:false,trial:false,trialUsed:!paid || !!s?.trial_used};
+ return {key:"expired",label:"Expiré",badge:"red",date:"Expiré",remaining:"Lecture seule",active:false,canWrite:false,trial:false,trialUsed:!paid || !!s?.trial_used};
+}
+function currentSubscriptionState(){
+ const kind=mpAccountKind();
+ const isAgent=kind==="agent_attached"||kind==="agent_independent";
+ const a=getCurrentAgent();
+ const s=isAgent?(a?.subscription||data.subscription||{}):(data.subscription||{});
+ return {kind,subscription:s,display:subscriptionDisplay(s)};
+}
+function accountCanWrite(){
+ const st=currentSubscriptionState();
+ return st.display.canWrite===true;
+}
+function requireWriteAccess(action="cette action"){
+ if(accountCanWrite()) return true;
+ const st=currentSubscriptionState();
+ alert(`Lecture seule : ${action} est désactivée car votre essai ou abonnement est expiré.`);
+ return false;
 }
 function paymentStatusDisplay(status){
  const k=String(status||"pending").toLowerCase();
@@ -709,6 +734,30 @@ function validateSelectedSubscriptionOffer(){
  return true;
 }
 
+function applySubscriptionWriteLock(){
+ const writable=accountCanWrite();
+ const selectors=[
+   '#newOperationBtn','button[onclick*="openOperation"]','button[onclick*="openExpense"]','button[onclick*="openProduct"]',
+   'button[onclick*="saveDayOpening"]','button[onclick*="closeDayEntry"]','button[onclick*="openAgent"]',
+   'button[onclick*="deactivateAgent"]','button[onclick*="save"]'
+ ];
+ document.querySelectorAll(selectors.join(',')+', #settingsForm button[type="submit"]').forEach(el=>{
+   if(el.closest('#subscriptionPricing')) return;
+   el.disabled=!writable;
+   el.classList.toggle('is-disabled',!writable);
+   el.title=writable?'':'Lecture seule : abonnement/essai expiré';
+ });
+ document.querySelectorAll('[data-write-control]').forEach(el=>{
+   el.disabled=!writable;
+   el.classList.toggle('is-disabled',!writable);
+ });
+ const msg=document.getElementById('subscriptionOfferMessage');
+ if(msg && !writable){
+   msg.textContent='Lecture seule : votre essai ou abonnement est expiré. Vous pouvez consulter vos données et souscrire à nouveau, mais aucune écriture n’est autorisée avant réactivation. L’essai gratuit ne sera jamais recréé.';
+   msg.classList.add('warning');
+ }
+}
+
 function renderSubscription(){
  const role=mpRole(),accountType=mpAccountType(),kind=mpAccountKind();
  const validRole=kind!==null;
@@ -740,6 +789,13 @@ function renderSubscription(){
 
  updateSubscriptionPlanActions(expected);
  renderSubscriptionSummary("subscription",s,price,isAgent);
+ applySubscriptionWriteLock();
+ const sv=subscriptionDisplay(s);
+ const offerMsg=document.getElementById("subscriptionOfferMessage");
+ if(offerMsg && sv.trial){
+   offerMsg.textContent="Période d’essai valable : lecture + écriture autorisées. Cet essai est unique pour ce compte et ne sera jamais renouvelé.";
+   offerMsg.classList.remove("warning");
+ }
  const rows=data.payments.filter(p=>!isAgent||p.agentId===a?.id);
  paymentsTable.innerHTML=rows.length?rows.map(p=>{const ps=paymentStatusDisplay(p.status);return `<tr><td>${fmt(p.date)}</td><td>${esc(p.account)}</td><td>${money(p.amount)}</td><td><span class="badge ${ps[1]}">${esc(ps[0])}</span></td><td>${esc(p.reference)}</td></tr>`}).join(""):`<tr><td colspan="5" class="empty">Aucun paiement.</td></tr>`;
 }
@@ -803,14 +859,10 @@ function updateDayUI(){
     : "<strong>Journée fermée</strong><br>Ouvrez une journée pour commencer les opérations.";
 }
 function agentSubscriptionActive(){
-  const role=mpRole();
-  if(role!=="agent" && role!=="agent_independent") return true;
-  const a=getCurrentAgent();
-  const s=role==="agent_independent" ? (data.subscription||{}) : (a?.subscription||data.subscription||{});
-  return !!(s.status==="active" && (!s.expiresAt || new Date(s.expiresAt)>new Date()));
+  return isAgentRole(mpRole()) ? accountCanWrite() : true;
 }
 function canAgentOperate(){
-  return !isAgentRole(mpRole()) || (agentSubscriptionActive() && accountDayOpen());
+  return !isAgentRole(mpRole()) || (accountCanWrite() && accountDayOpen());
 }
 function applyAgentOperationLock(){
   const allowed=canAgentOperate();
@@ -992,6 +1044,7 @@ async function mpLoadFromSupabase(){
       subscription:{
         status:sub.status||"inactive",
         everSubscribed:!!sub.ever_subscribed,
+        trialUsed:!!sub.trial_used || (!sub.ever_subscribed && sub.expires_at && new Date(sub.expires_at)<=new Date()),
         price:500,
         startedAt:sub.started_at||sub.starts_at||null,
         expiresAt:sub.expires_at||null
@@ -1090,6 +1143,7 @@ async function mpLoadFromSupabase(){
   data.subscription={
     status:ownSub.status||"inactive",
     everSubscribed:!!ownSub.ever_subscribed,
+    trialUsed:!!ownSub.trial_used || (!ownSub.ever_subscribed && ownSub.expires_at && new Date(ownSub.expires_at)<=new Date()),
     price:rolePrice,
     startedAt:ownSub.started_at||ownSub.starts_at||null,
     expiresAt:ownSub.expires_at||null
@@ -1584,7 +1638,7 @@ if(mpSupabase){
   };
   /* Opérations: le solde et l'écriture sont gérés atomiquement par PostgreSQL. */
   openOperation=async function(){
-    const role=mpRole(); if(isAgentRole(role)&&!agentSubscriptionActive()){alert("Votre abonnement agent n'est pas actif.");return;} if(isAgentRole(role)&&!getDay()?.open){openDayStart();return;}
+    const role=mpRole(); if(!requireWriteAccess("la création d'opérations"))return; if(isAgentRole(role)&&!agentSubscriptionActive()){alert("Votre abonnement agent n'est pas actif.");return;} if(isAgentRole(role)&&!getDay()?.open){openDayStart();return;}
     const options=role==="merchant"?data.agents.filter(a=>a.status!=="inactive").map(a=>`<option value="${esc(a.id)}">${esc(a.name)}</option>`).join(""):"";
     openModal("Nouvelle opération",`<div class="notice">La commission saisie sur l’opération reste inchangée. Si vous activez le transfert, le montant est déplacé séparément de Espèces vers le portefeuille électronique du même opérateur (MTN, Moov ou Celtiis). Jamais vers Espèces. Le système vérifie l'abonnement, la journée, le solde et l'ID transaction avant d'enregistrer le mouvement.</div><form id="operationForm" class="form-grid" style="margin-top:13px"><div class="field full"><label>Compte concerné</label><select id="opTargetAgent" name="targetAgent"><option value="">Compte marchand</option>${options}</select></div><div class="field"><label>Type d'opération</label><select name="type" required><option>Dépôt</option><option>Retrait</option><option>Vente de crédit</option><option>Vente de forfait</option></select></div><div class="field"><label>Compte opérateur</label><select name="operator" required><option>MTN</option><option>Moov</option><option>Celtiis</option></select></div><div class="field"><label>Montant</label><input name="amount" type="number" min="1" required></div><div class="field"><label>ID transaction</label><input name="transactionId" required autocomplete="off"></div><div class="field"><label>Commission</label><input name="fee" type="number" min="0" value="0"></div><div class="field full"><label style="display:flex;gap:9px;align-items:center"><input name="transferCommission" type="checkbox" value="1"> Transférer immédiatement la commission vers le portefeuille électronique de l’opérateur concerné</label><small style="color:var(--muted)">La commission n’est jamais transférée en espèces.</small></div><div class="field"><label>Client / numéro</label><input name="client"></div><div class="field"><label>Date</label><input name="date" type="datetime-local" value="${new Date().toISOString().slice(0,16)}"></div><div class="field full"><label>Observation</label><textarea name="note" rows="3"></textarea></div><div class="field full"><div class="actions"><button type="button" class="btn gray" onclick="closeModal()">Annuler</button><button class="btn">Enregistrer</button></div></div></form>`);
     if(role!=="merchant")document.getElementById("opTargetAgent").style.display="none";
@@ -1593,16 +1647,16 @@ if(mpSupabase){
 
   deleteOperation=async function(){alert("Les opérations sont conservées pour la traçabilité. Une correction devra être enregistrée par contre-mouvement plutôt que supprimer l'écriture.");};
 
-  openExpense=function(){openModal("Nouvelle dépense",`<form id="expenseForm"><div class="field"><label>Catégorie</label><select name="category"><option>Loyer</option><option>Électricité</option><option>Internet</option><option>Transport</option><option>Approvisionnement</option><option>Salaire</option><option>Autre</option></select></div><div class="field"><label>Montant</label><input name="amount" type="number" min="1" required></div><div class="field"><label>Observation</label><textarea name="note"></textarea></div><div class="actions"><button type="button" class="btn gray" onclick="closeModal()">Annuler</button><button class="btn">Enregistrer</button></div></form>`);document.getElementById("expenseForm").onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target),x={category:f.get("category"),amount:Number(f.get("amount")),note:f.get("note"),date:isoNow()};try{await mpSaveExpenseLocal(x);await mpLoadFromSupabase();closeModal();renderAll();}catch(err){alert(mpDbError(err));}}};
-  deleteExpense=async function(id){if(confirm("Supprimer cette dépense ?")){try{await mpDeleteExpenseDb(id);await mpLoadFromSupabase();renderAll();}catch(e){alert(mpDbError(e));}}};
-  openProduct=function(){openModal("Nouveau produit",`<form id="productForm" class="form-grid"><div class="field"><label>Produit</label><input name="name" required></div><div class="field"><label>Quantité</label><input name="qty" type="number" min="0" value="0"></div><div class="field"><label>Seuil</label><input name="threshold" type="number" min="0" value="5"></div><div class="field"><label>Prix achat</label><input name="buy" type="number" min="0"></div><div class="field"><label>Prix vente</label><input name="sell" type="number" min="0"></div><div class="full actions"><button type="button" class="btn gray" onclick="closeModal()">Annuler</button><button class="btn">Enregistrer</button></div></form>`);document.getElementById("productForm").onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target),x={name:f.get("name"),qty:Number(f.get("qty"))||0,threshold:Number(f.get("threshold"))||0,buy:Number(f.get("buy"))||0,sell:Number(f.get("sell"))||0};try{await mpSaveProductLocal(x);await mpLoadFromSupabase();closeModal();renderAll();}catch(err){alert(mpDbError(err));}}};
-  deleteProduct=async function(id){if(confirm("Supprimer ce produit ?")){try{await mpDeleteProductDb(id);await mpLoadFromSupabase();renderAll();}catch(e){alert(mpDbError(e));}}};
+  openExpense=function(){if(!requireWriteAccess("la création d'une dépense"))return;openModal("Nouvelle dépense",`<form id="expenseForm"><div class="field"><label>Catégorie</label><select name="category"><option>Loyer</option><option>Électricité</option><option>Internet</option><option>Transport</option><option>Approvisionnement</option><option>Salaire</option><option>Autre</option></select></div><div class="field"><label>Montant</label><input name="amount" type="number" min="1" required></div><div class="field"><label>Observation</label><textarea name="note"></textarea></div><div class="actions"><button type="button" class="btn gray" onclick="closeModal()">Annuler</button><button class="btn">Enregistrer</button></div></form>`);document.getElementById("expenseForm").onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target),x={category:f.get("category"),amount:Number(f.get("amount")),note:f.get("note"),date:isoNow()};try{await mpSaveExpenseLocal(x);await mpLoadFromSupabase();closeModal();renderAll();}catch(err){alert(mpDbError(err));}}};
+  deleteExpense=async function(id){if(!requireWriteAccess("la suppression d'une dépense"))return;if(confirm("Supprimer cette dépense ?")){try{await mpDeleteExpenseDb(id);await mpLoadFromSupabase();renderAll();}catch(e){alert(mpDbError(e));}}};
+  openProduct=function(){if(!requireWriteAccess("la création d'un produit"))return;openModal("Nouveau produit",`<form id="productForm" class="form-grid"><div class="field"><label>Produit</label><input name="name" required></div><div class="field"><label>Quantité</label><input name="qty" type="number" min="0" value="0"></div><div class="field"><label>Seuil</label><input name="threshold" type="number" min="0" value="5"></div><div class="field"><label>Prix achat</label><input name="buy" type="number" min="0"></div><div class="field"><label>Prix vente</label><input name="sell" type="number" min="0"></div><div class="full actions"><button type="button" class="btn gray" onclick="closeModal()">Annuler</button><button class="btn">Enregistrer</button></div></form>`);document.getElementById("productForm").onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target),x={name:f.get("name"),qty:Number(f.get("qty"))||0,threshold:Number(f.get("threshold"))||0,buy:Number(f.get("buy"))||0,sell:Number(f.get("sell"))||0};try{await mpSaveProductLocal(x);await mpLoadFromSupabase();closeModal();renderAll();}catch(err){alert(mpDbError(err));}}};
+  deleteProduct=async function(id){if(!requireWriteAccess("la suppression d'un produit"))return;if(confirm("Supprimer ce produit ?")){try{await mpDeleteProductDb(id);await mpLoadFromSupabase();renderAll();}catch(e){alert(mpDbError(e));}}};
 
-  save=async function(){try{await mpSaveProfile();renderAll();}catch(e){console.error(e);alert(mpDbError(e));}};
-  saveDayOpening=async function(){const f={mtn:openingMTN.value,moov:openingMoov.value,celtiis:openingCeltiis.value,cash:openingCash.value};try{await mpOpenDayDb(f);await mpLoadFromSupabase();renderAll();updateDayUI();alert("Journée ouverte.");}catch(e){alert(mpDbError(e));}};
-  closeDayEntry=function(){openDayClosingModal();};
-  deactivateAgent=async function(id){if(confirm("Désactiver cet agent ? Son historique sera conservé.")){try{await mpDeactivateAgentDb(id);await mpLoadFromSupabase();renderAll();}catch(e){alert(mpDbError(e));}}};
-  openAgent=function(){openModal("Créer un agent",`<form id="agentForm" class="form-grid"><div class="notice full">L’agent rattaché aura son propre compte, ses propres portefeuilles et un abonnement de 500 F CFA/mois. Vous pouvez créer autant d’agents rattachés que nécessaire.</div><div class="field"><label>Nom complet</label><input name="name" required></div><div class="field"><label>Téléphone</label><input name="phone" required></div><div class="field"><label>Email de connexion</label><input name="email" type="email" required></div><div class="actions full"><button type="button" class="btn gray" onclick="closeModal()">Annuler</button><button class="btn">Créer l’agent</button></div></form>`);document.getElementById("agentForm").onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);try{const r=await mpCreateAgentDb({name:String(f.get("name")).trim(),phone:String(f.get("phone")).trim(),email:String(f.get("email")).trim().toLowerCase()});await mpLoadFromSupabase();closeModal();openModal("Agent créé",`<div class="notice"><b>${esc(r.name||f.get("name"))}</b> a été créé.</div><div class="stat-row"><span>Email</span><b>${esc(r.email||f.get("email"))}</b></div>${r.temporary_password?`<div class="stat-row"><span>Mot de passe temporaire</span><b>${esc(r.temporary_password)}</b></div>`:""}<div class="notice warning" style="margin-top:12px">L’agent devra modifier son mot de passe lors de sa première connexion.</div><div class="actions"><button class="btn" onclick="closeModal()">Fermer</button></div>`);}catch(err){alert(mpDbError(err));}}};
+  save=async function(){if(!requireWriteAccess("la modification du profil"))return;try{await mpSaveProfile();renderAll();}catch(e){console.error(e);alert(mpDbError(e));}};
+  saveDayOpening=async function(){if(!requireWriteAccess("l'ouverture de la journée"))return;const f={mtn:openingMTN.value,moov:openingMoov.value,celtiis:openingCeltiis.value,cash:openingCash.value};try{await mpOpenDayDb(f);await mpLoadFromSupabase();renderAll();updateDayUI();alert("Journée ouverte.");}catch(e){alert(mpDbError(e));}};
+  closeDayEntry=function(){if(!requireWriteAccess("la clôture de la journée"))return;openDayClosingModal();};
+  deactivateAgent=async function(id){if(!requireWriteAccess("la gestion des agents"))return;if(confirm("Désactiver cet agent ? Son historique sera conservé.")){try{await mpDeactivateAgentDb(id);await mpLoadFromSupabase();renderAll();}catch(e){alert(mpDbError(e));}}};
+  openAgent=function(){if(!requireWriteAccess("la création d'un agent"))return;openModal("Créer un agent",`<form id="agentForm" class="form-grid"><div class="notice full">L’agent rattaché aura son propre compte, ses propres portefeuilles et un abonnement de 500 F CFA/mois. Vous pouvez créer autant d’agents rattachés que nécessaire.</div><div class="field"><label>Nom complet</label><input name="name" required></div><div class="field"><label>Téléphone</label><input name="phone" required></div><div class="field"><label>Email de connexion</label><input name="email" type="email" required></div><div class="actions full"><button type="button" class="btn gray" onclick="closeModal()">Annuler</button><button class="btn">Créer l’agent</button></div></form>`);document.getElementById("agentForm").onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);try{const r=await mpCreateAgentDb({name:String(f.get("name")).trim(),phone:String(f.get("phone")).trim(),email:String(f.get("email")).trim().toLowerCase()});await mpLoadFromSupabase();closeModal();openModal("Agent créé",`<div class="notice"><b>${esc(r.name||f.get("name"))}</b> a été créé.</div><div class="stat-row"><span>Email</span><b>${esc(r.email||f.get("email"))}</b></div>${r.temporary_password?`<div class="stat-row"><span>Mot de passe temporaire</span><b>${esc(r.temporary_password)}</b></div>`:""}<div class="notice warning" style="margin-top:12px">L’agent devra modifier son mot de passe lors de sa première connexion.</div><div class="actions"><button class="btn" onclick="closeModal()">Fermer</button></div>`);}catch(err){alert(mpDbError(err));}}};
 
   /* ================================================================
      FEDAPAY V8 — paiement d'abonnement réel via Edge Function
