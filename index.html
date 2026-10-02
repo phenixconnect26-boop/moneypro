@@ -625,7 +625,7 @@ function normalizeSubscriptionRow(row){
  const everSubscribed = !explicitTrial && paidMarker;
  const expiresAt = r.expires_at || r.expires_on || r.expiration_date || r.subscription_end || r.subscription_ends_at || r.trial_ends_at || r.trial_expires_at || r.trial_end_at || r.trial_end || r.current_period_end || r.ends_at || r.end_at || null;
  const trialEndsAt = r.trial_ends_at || r.trial_expires_at || r.trial_end_at || r.trial_end || r.trial_expires_on || r.trial_end_date || (explicitTrial?expiresAt:null);
- const trialUsed = !!r.trial_used || !!r.trial_started_at || !!r.trial_start_at || !!r.trial_ends_at || !!r.trial_expires_at || !!r.trial_end_at || !!r.trial_end || (!everSubscribed && !!expiresAt && new Date(expiresAt)<=new Date());
+ const trialUsed = r.trial_used===true || !!r.trial_started_at || !!r.trial_start_at || !!r.trial_ends_at || !!r.trial_expires_at || !!r.trial_end_at || !!r.trial_end;
  return {
    ...r,
    status:status||"inactive",
@@ -1017,29 +1017,24 @@ async function mpLoadFromSupabase(){
   // L'abonnement est lu en priorité et indépendamment des autres données.
   // Ainsi une erreur sur les opérations, stocks ou journées ne peut plus faire
   // disparaître l'état réel de l'abonnement.
-  let subR;
-  // L'abonnement propre au compte doit être recherché par son propriétaire.
-  // Ne jamais utiliser merchant_id pour un agent : cela pourrait charger
-  // l'abonnement du marchand et laisser l'agent sans état réel.
-  if(normalizedAccountType==="merchant"){
-    subR=await mpSupabase.from("subscriptions").select("*").or(`account_id.eq.${u.id},profile_id.eq.${u.id},merchant_id.eq.${u.id}`).order("created_at",{ascending:false});
-  }else{
-    subR=await mpSupabase.from("subscriptions").select("*").or(`account_id.eq.${u.id},profile_id.eq.${u.id}`).order("created_at",{ascending:false});
+  // Lecture robuste de l'abonnement Supabase : on ne suppose pas que toutes les
+  // anciennes colonnes de la table subscriptions existent encore. On teste
+  // séparément les colonnes d'identification du propriétaire et on fusionne
+  // les résultats. Le type de compte reste celui du profil Supabase.
+  const subscriptionOwnerColumns=["account_id","profile_id","user_id","owner_id","subscriber_id","customer_id","member_id"];
+  const subscriptionMap=new Map();
+  for(const col of subscriptionOwnerColumns){
+    try{
+      const q=await mpSupabase.from("subscriptions").select("*").eq(col,u.id);
+      if(!q.error){
+        for(const row of (q.data||[])){
+          const key=String(row.id||row.subscription_id||[row.account_id,row.profile_id,row.user_id,row.owner_id,row.subscriber_id,row.customer_id,row.member_id,row.created_at].join("|"));
+          subscriptionMap.set(key,row);
+        }
+      }
+    }catch(_e){}
   }
-  if(subR.error)throw subR.error;
-  let rawSubscriptionRows=subR.data||[];
-  if(!rawSubscriptionRows.length){
-    // Compatibilité avec les anciennes lignes qui peuvent utiliser un autre
-    // identifiant propriétaire. Chaque colonne est testée séparément : une
-    // colonne absente ne doit jamais empêcher la lecture de l'abonnement.
-    const ownerColumns=["user_id","owner_id","subscriber_id","customer_id","member_id"];
-    for(const col of ownerColumns){
-      try{
-        const q=await mpSupabase.from("subscriptions").select("*").eq(col,u.id).order("created_at",{ascending:false});
-        if(!q.error && (q.data||[]).length){ rawSubscriptionRows=q.data||[]; break; }
-      }catch(_e){}
-    }
-  }
+  const rawSubscriptionRows=[...subscriptionMap.values()].sort((a,b)=>new Date(b.created_at||b.updated_at||0)-new Date(a.created_at||a.updated_at||0));
   const subscriptionRows=rawSubscriptionRows.map(normalizeSubscriptionRow);
 
   const payQ=isIndependentAgent?mpSupabase.from("subscription_payments").select("*").eq("account_id",u.id).order("created_at",{ascending:false}):mpSupabase.from("subscription_payments").select("*").eq("merchant_id",merchantId).order("created_at",{ascending:false});
@@ -1089,7 +1084,7 @@ async function mpLoadFromSupabase(){
   const findSub=(accountId,type)=>{
     const wanted=String(type||"").toLowerCase();
     const rows=subscriptionRows.filter(s=>{
-      if(!(s.account_id===accountId||s.profile_id===accountId)) return false;
+      if(![s.account_id,s.profile_id,s.user_id,s.owner_id,s.subscriber_id,s.customer_id,s.member_id].includes(accountId)) return false;
       if(!wanted) return true;
       const st=String(s.subscriber_type||s.account_type||s.role||"").trim().toLowerCase();
       if(wanted==="merchant") return ["merchant","marchand"].includes(st);
