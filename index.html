@@ -620,10 +620,11 @@ function roleDisplayLabel(role,accountType,merchantId){
 function normalizeSubscriptionRow(row){
  const r=row||{};
  const status=String(r.status||"").trim().toLowerCase();
- const explicitTrial = r.is_trial===true || r.trial===true || ["trial","trialing","essai","free_trial"].includes(status);
- const everSubscribed = !explicitTrial && (!!r.ever_subscribed || ["paid","active_paid","approved","successful","success","renewed"].includes(status) || !!r.paid_at);
- const expiresAt = r.expires_at || r.trial_ends_at || r.trial_expires_at || r.trial_end_at || r.trial_end || r.current_period_end || r.ends_at || r.end_at || null;
- const trialEndsAt = r.trial_ends_at || r.trial_expires_at || r.trial_end_at || r.trial_end || (explicitTrial?expiresAt:null);
+ const explicitTrial = r.is_trial===true || r.trial===true || ["trial","trialing","essai","free_trial","free-trial"].includes(status) || String(r.subscription_type||r.plan_type||"").trim().toLowerCase()==="trial";
+ const paidMarker = !!r.ever_subscribed || ["paid","active_paid","approved","successful","success","renewed"].includes(status) || !!r.paid_at || !!r.payment_id || !!r.fedapay_transaction_id;
+ const everSubscribed = !explicitTrial && paidMarker;
+ const expiresAt = r.expires_at || r.expires_on || r.expiration_date || r.subscription_end || r.subscription_ends_at || r.trial_ends_at || r.trial_expires_at || r.trial_end_at || r.trial_end || r.current_period_end || r.ends_at || r.end_at || null;
+ const trialEndsAt = r.trial_ends_at || r.trial_expires_at || r.trial_end_at || r.trial_end || r.trial_expires_on || r.trial_end_date || (explicitTrial?expiresAt:null);
  const trialUsed = !!r.trial_used || !!r.trial_started_at || !!r.trial_start_at || !!r.trial_ends_at || !!r.trial_expires_at || !!r.trial_end_at || !!r.trial_end || (!everSubscribed && !!expiresAt && new Date(expiresAt)<=new Date());
  return {
    ...r,
@@ -1028,12 +1029,16 @@ async function mpLoadFromSupabase(){
   if(subR.error)throw subR.error;
   let rawSubscriptionRows=subR.data||[];
   if(!rawSubscriptionRows.length){
-    // Compatibilité avec les anciennes lignes qui rattachent l'abonnement
-    // directement à l'identifiant utilisateur. Cette requête est optionnelle.
-    try{
-      const legacySub=await mpSupabase.from("subscriptions").select("*").eq("user_id",u.id).order("created_at",{ascending:false});
-      if(!legacySub.error) rawSubscriptionRows=legacySub.data||[];
-    }catch(_e){}
+    // Compatibilité avec les anciennes lignes qui peuvent utiliser un autre
+    // identifiant propriétaire. Chaque colonne est testée séparément : une
+    // colonne absente ne doit jamais empêcher la lecture de l'abonnement.
+    const ownerColumns=["user_id","owner_id","subscriber_id","customer_id","member_id"];
+    for(const col of ownerColumns){
+      try{
+        const q=await mpSupabase.from("subscriptions").select("*").eq(col,u.id).order("created_at",{ascending:false});
+        if(!q.error && (q.data||[]).length){ rawSubscriptionRows=q.data||[]; break; }
+      }catch(_e){}
+    }
   }
   const subscriptionRows=rawSubscriptionRows.map(normalizeSubscriptionRow);
 
@@ -1091,6 +1096,7 @@ async function mpLoadFromSupabase(){
       if(wanted==="agent") return ["agent","agent_attached","attached_agent","agent_rattache","agent_rattaché","agent_independent","independent_agent","agent_independant","agent_indépendant","independent"].includes(st);
       return true;
     });
+    if(!rows.length) return null;
     return pickSubscriptionRow(rows);
   };
   const findDay=accountId=>agentDayRows.find(d=>d.profile_id===accountId)||null;
@@ -1129,7 +1135,8 @@ async function mpLoadFromSupabase(){
     };
   });
 
-  const ownSub=findSub(u.id,normalizedAccountType==="merchant"?"merchant":"agent") || pickSubscriptionRow(subscriptionRows.filter(s=>s.account_id===u.id||s.profile_id===u.id||s.user_id===u.id)) || {};
+  const ownCandidates=subscriptionRows.filter(s=>s.account_id===u.id||s.profile_id===u.id||s.user_id===u.id||s.owner_id===u.id||s.subscriber_id===u.id||s.customer_id===u.id||s.member_id===u.id);
+  const ownSub=findSub(u.id,normalizedAccountType==="merchant"?"merchant":"agent") || pickSubscriptionRow(ownCandidates) || {};
   const ownProfile={
     id:u.id,
     role:me.role,
@@ -1202,8 +1209,16 @@ async function mpLoadFromSupabase(){
         ? 1000
         : null;
   if(rolePrice===null) throw new Error("Type de compte Supabase non pris en charge.");
+  // Si le profil porte directement les métadonnées d'essai et qu'aucune ligne
+  // d'abonnement exploitable n'a été trouvée, les utiliser comme dernier recours.
+  let resolvedSub=ownSub;
+  if(!resolvedSub || !Object.keys(resolvedSub).length){
+    const profileTrialFields={};
+    ["status","is_trial","trial","trial_used","trial_started_at","trial_start_at","trial_ends_at","trial_expires_at","trial_end_at","trial_end","expires_at","current_period_end"].forEach(k=>{ if(me[k]!==undefined && me[k]!==null) profileTrialFields[k]=me[k]; });
+    if(Object.keys(profileTrialFields).length) resolvedSub=profileTrialFields;
+  }
   data.subscription={
-    ...normalizeSubscriptionRow(ownSub),
+    ...normalizeSubscriptionRow(resolvedSub),
     price:rolePrice
   };
   data.profile.subscriptionStatus=subscriptionDisplay(data.subscription||{});
