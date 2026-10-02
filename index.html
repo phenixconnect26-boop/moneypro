@@ -589,7 +589,18 @@ function renderReports(){
 }
 
 /* SETTINGS */
-function loadSettings(){shopName.value=data.profile.shopName;merchantName.value=data.profile.name;merchantPhone.value=data.profile.phone;merchantEmail.value=data.profile.email;shopNote.value=data.profile.note||"";merchantContactPhone.value=data.profile.merchantContactPhone||"";document.getElementById("agentMerchantContact").classList.toggle("hidden",!isAgentRole(data.profile.role));sideName.textContent=data.profile.name||"";sideRole.textContent=roleDisplayLabel(data.profile.role,data.profile.account_type,data.profile.merchant_id);const k=mpAccountKind();const labels={merchant:"Marchand",agent_attached:"Agent rattaché",agent_independent:"Agent indépendant"};const price=currentSubscriptionPrice();const at=document.getElementById("accountTypeDisplay"),as=document.getElementById("accountSubscriptionDisplay"),ap=document.getElementById("accountSubscriptionPriceDisplay");if(at)at.value=labels[k]||"Type non reconnu";if(as)as.value=labels[k]||"Aucun abonnement";if(ap)ap.value=price==null?"—":money(price)+" / mois";ensureDayStart()}
+function loadSettings(){
+ shopName.value=data.profile.shopName;merchantName.value=data.profile.name;merchantPhone.value=data.profile.phone;merchantEmail.value=data.profile.email;shopNote.value=data.profile.note||"";merchantContactPhone.value=data.profile.merchantContactPhone||"";
+ document.getElementById("agentMerchantContact").classList.toggle("hidden",!isAgentRole(data.profile.role));
+ sideName.textContent=data.profile.name||"";sideRole.textContent=roleDisplayLabel(data.profile.role,data.profile.account_type,data.profile.merchant_id);
+ const k=mpAccountKind(),labels={merchant:"Marchand",agent_attached:"Agent rattaché",agent_independent:"Agent indépendant"},price=currentSubscriptionPrice();
+ const at=document.getElementById("accountTypeDisplay"),as=document.getElementById("accountSubscriptionDisplay"),ap=document.getElementById("accountSubscriptionPriceDisplay");
+ const sv=subscriptionDisplay(data.subscription||{});
+ if(at)at.value=labels[k]||"Type non reconnu";
+ if(as)as.value=(sv.label||"État inconnu")+(sv.date?" — "+sv.date:"");
+ if(ap)ap.value=price==null?"—":money(price)+" / mois";
+ ensureDayStart()
+}
 settingsForm.onsubmit=e=>{e.preventDefault();data.profile.shopName=shopName.value;data.profile.name=merchantName.value;data.profile.phone=merchantPhone.value;data.profile.email=merchantEmail.value;data.profile.merchantContactPhone=merchantContactPhone.value.trim();data.profile.note=shopNote.value;save();alert("Paramètres enregistrés.")}
 
 /* DASHBOARD + SUB */
@@ -606,27 +617,54 @@ function roleDisplayLabel(role,accountType,merchantId){
  if(role==="agent") return "Agent rattaché";
  return "";
 }
+function normalizeSubscriptionRow(row){
+ const r=row||{};
+ const status=String(r.status||"").trim().toLowerCase();
+ const explicitTrial = r.is_trial===true || r.trial===true || ["trial","essai","free_trial"].includes(status);
+ const everSubscribed = !!r.ever_subscribed || ["paid","active_paid","approved","successful","success","renewed"].includes(status) || (!!r.paid_at && !explicitTrial);
+ const expiresAt = r.expires_at || r.trial_ends_at || r.trial_expires_at || r.current_period_end || r.ends_at || r.end_at || null;
+ const trialEndsAt = r.trial_ends_at || r.trial_expires_at || (explicitTrial?expiresAt:null);
+ const trialUsed = !!r.trial_used || !!r.trial_started_at || !!r.trial_start_at || !!r.trial_ends_at || !!r.trial_expires_at || (!everSubscribed && !!expiresAt && new Date(expiresAt)<=new Date());
+ return {
+   ...r,
+   status:status||"inactive",
+   everSubscribed,
+   trial_used:trialUsed,
+   isTrial:explicitTrial || (!everSubscribed && !!trialEndsAt) || (!everSubscribed && status==="active" && !!expiresAt),
+   startedAt:r.started_at||r.starts_at||r.paid_at||r.trial_started_at||r.trial_start_at||null,
+   expiresAt,
+   trialEndsAt
+ };
+}
+function pickSubscriptionRow(rows){
+ const list=(rows||[]).map(normalizeSubscriptionRow);
+ if(!list.length)return {};
+ const now=Date.now();
+ const live=list.find(s=>{
+   const d=s.expiresAt?new Date(s.expiresAt).getTime():null;
+   const future=d==null || d>now;
+   const trial=s.isTrial===true && future;
+   const paid=s.everSubscribed===true && !s.isTrial && ["active","paid","approved","successful","success","renewed","active_paid"].includes(s.status) && future;
+   return trial||paid;
+ });
+ return live||list[0];
+}
 function subscriptionDisplay(s){
+ const x=normalizeSubscriptionRow(s);
  const now=new Date();
- const expiry=s?.expiresAt?new Date(s.expiresAt):null;
+ const expiry=x.expiresAt?new Date(x.expiresAt):null;
  const validExpiry=expiry&&!Number.isNaN(expiry.getTime());
- const paid=!!s?.everSubscribed;
  const future=validExpiry && expiry>now;
- const active=s?.status==="active" && (!validExpiry || future);
- // L'essai est séparé de l'abonnement payant : s'il existe une date d'essai future
- // et qu'aucun abonnement payant n'a encore été souscrit, il reste valable même si
- // le statut de l'abonnement payant n'est pas encore "active". Il n'est jamais
- // recréé ou prolongé par le navigateur.
- const trial=!paid && future && s?.status!=="expired";
- const expiredTrial=!paid && validExpiry && expiry<=now;
- const expired=expiredTrial || (validExpiry && expiry<=now) || s?.status==="expired" || s?.status==="pending" || !s?.status || s?.status==="inactive";
+ const trialState=x.isTrial===true || ["trial","essai","free_trial"].includes(x.status);
+ const paid=x.everSubscribed===true && !trialState;
+ const paidActive=paid && ["active","paid","approved","successful","success","renewed","active_paid"].includes(x.status) && (!validExpiry || future);
+ const trial=trialState && future && !paid;
  if(trial){
    const ms=Math.max(0,expiry-now); const days=Math.max(0,Math.ceil(ms/86400000));
-   return {key:"trial",label:"Essai",badge:"orange",date:"Essai + "+days+" "+(days===1?"jour":"jours"),remaining:"",active:true,canWrite:true,trial:true,trialUsed:false};
+   return {key:"trial",label:"Essai",badge:"orange",date:"Essai + "+days+" "+(days===1?"jour":"jours"),remaining:"Lecture + écriture",active:true,canWrite:true,trial:true,trialUsed:false};
  }
- if(active && paid) return {key:"active",label:"Actif",badge:"green",date:validExpiry?"Actif jusqu'au "+fmt(s.expiresAt):"Actif",remaining:"",active:true,canWrite:true,trial:false,trialUsed:true};
- if(expired) return {key:"expired",label:"Expiré",badge:"red",date:"Expiré",remaining:"Lecture seule — abonnement/essai expiré",active:false,canWrite:false,trial:false,trialUsed:!paid || !!s?.trial_used};
- return {key:"expired",label:"Expiré",badge:"red",date:"Expiré",remaining:"Lecture seule",active:false,canWrite:false,trial:false,trialUsed:!paid || !!s?.trial_used};
+ if(paidActive) return {key:"active",label:"Actif",badge:"green",date:validExpiry?"Actif jusqu'au "+fmt(x.expiresAt):"Actif",remaining:"Lecture + écriture",active:true,canWrite:true,trial:false,trialUsed:true};
+ return {key:"expired",label:"Expiré",badge:"red",date:"Expiré",remaining:"Lecture seule — abonnement/essai expiré",active:false,canWrite:false,trial:false,trialUsed:!!x.trial_used};
 }
 function currentSubscriptionState(){
  const kind=mpAccountKind();
@@ -975,12 +1013,28 @@ async function mpLoadFromSupabase(){
   const expQ=isIndependentAgent?mpSupabase.from("expenses").select("*").eq("owner_id",u.id).order("created_at",{ascending:false}):mpSupabase.from("expenses").select("*").eq("merchant_id",merchantId).order("created_at",{ascending:false});
   const prodQ=isIndependentAgent?Promise.resolve({data:[],error:null}):mpSupabase.from("inventory_products").select("*").eq("merchant_id",merchantId).order("created_at",{ascending:false});
   const agentQ=isIndependentAgent?Promise.resolve({data:[],error:null}):mpSupabase.from("profiles").select("*").eq("merchant_id",merchantId).eq("role","agent").order("created_at",{ascending:true});
-  const subQ=isIndependentAgent?mpSupabase.from("subscriptions").select("*").eq("account_id",u.id):mpSupabase.from("subscriptions").select("*").eq("merchant_id",merchantId).order("created_at",{ascending:false});
+  // L'abonnement est lu en priorité et indépendamment des autres données.
+  // Ainsi une erreur sur les opérations, stocks ou journées ne peut plus faire
+  // disparaître l'état réel de l'abonnement.
+  let subR;
+  if(isIndependentAgent){
+    subR=await mpSupabase.from("subscriptions").select("*").eq("account_id",u.id).order("created_at",{ascending:false});
+  }else if(normalizedAccountType==="merchant"){
+    subR=await mpSupabase.from("subscriptions").select("*").eq("merchant_id",u.id).order("created_at",{ascending:false});
+  }else{
+    subR=await mpSupabase.from("subscriptions").select("*").eq("account_id",u.id).order("created_at",{ascending:false});
+    if(subR.error || !(subR.data||[]).length){
+      subR=await mpSupabase.from("subscriptions").select("*").eq("merchant_id",merchantId).order("created_at",{ascending:false});
+    }
+  }
+  if(subR.error)throw subR.error;
+  const subscriptionRows=(subR.data||[]).map(normalizeSubscriptionRow);
+
   const payQ=isIndependentAgent?mpSupabase.from("subscription_payments").select("*").eq("account_id",u.id).order("created_at",{ascending:false}):mpSupabase.from("subscription_payments").select("*").eq("merchant_id",merchantId).order("created_at",{ascending:false});
   const ctQ=isIndependentAgent?mpSupabase.from("commission_transfers").select("*").eq("account_owner_id",u.id).order("created_at",{ascending:false}):mpSupabase.from("commission_transfers").select("*").eq("merchant_id",merchantId).order("created_at",{ascending:false});
   const dayQ=mpSupabase.from("business_days").select("*").eq("profile_id",u.id).eq("status","open").order("opened_at",{ascending:false}).limit(1);
-  const [walletR,opR,expR,prodR,agentR,subR,payR,ctR,dayR]=await Promise.all([walletQ,opQ,expQ,prodQ,agentQ,subQ,payQ,ctQ,dayQ]);
-  for(const r of [walletR,opR,expR,prodR,agentR,subR,payR,ctR,dayR])if(r.error)throw r.error;
+  const [walletR,opR,expR,prodR,agentR,payR,ctR,dayR]=await Promise.all([walletQ,opQ,expQ,prodQ,agentQ,payQ,ctQ,dayQ]);
+  for(const r of [walletR,opR,expR,prodR,agentR,payR,ctR,dayR])if(r.error)throw r.error;
 
   const agentRows=agentR.data||[];
   const agentIds=agentRows.map(a=>a.id);
@@ -1021,11 +1075,11 @@ async function mpLoadFromSupabase(){
   data.merchantWallets=mpWalletsFromRows(merchantWalletRows);
 
   const findSub=(accountId,type)=>{
-    const rows=(subR.data||[]).filter(s=>
+    const rows=subscriptionRows.filter(s=>
       (s.account_id===accountId||s.profile_id===accountId) &&
       (!type||s.subscriber_type===type)
     );
-    return rows[0]||null;
+    return pickSubscriptionRow(rows);
   };
   const findDay=accountId=>agentDayRows.find(d=>d.profile_id===accountId)||null;
 
@@ -1041,14 +1095,10 @@ async function mpLoadFromSupabase(){
       status:a.is_active===false?"inactive":"active",
       merchantId,
       merchantPhone:merchantProfileRow.phone||"",
-      subscription:{
-        status:sub.status||"inactive",
-        everSubscribed:!!sub.ever_subscribed,
-        trialUsed:!!sub.trial_used || (!sub.ever_subscribed && sub.expires_at && new Date(sub.expires_at)<=new Date()),
-        price:500,
-        startedAt:sub.started_at||sub.starts_at||null,
-        expiresAt:sub.expires_at||null
-      },
+      subscription:normalizeSubscriptionRow({
+        ...sub,
+        price:500
+      }),
       profile:{
         role:"agent",
         account_type:"agent_attached",
@@ -1133,7 +1183,7 @@ async function mpLoadFromSupabase(){
   }));
 
   const rolePrice=normalizedAccountType==="merchant"
-    ? (!!ownSub.ever_subscribed?2000:1000)
+    ? (!!ownSub.everSubscribed?2000:1000)
     : normalizedAccountType==="agent_attached"
       ? 500
       : normalizedAccountType==="agent_independent"
@@ -1141,13 +1191,12 @@ async function mpLoadFromSupabase(){
         : null;
   if(rolePrice===null) throw new Error("Type de compte Supabase non pris en charge.");
   data.subscription={
-    status:ownSub.status||"inactive",
-    everSubscribed:!!ownSub.ever_subscribed,
-    trialUsed:!!ownSub.trial_used || (!ownSub.ever_subscribed && ownSub.expires_at && new Date(ownSub.expires_at)<=new Date()),
-    price:rolePrice,
-    startedAt:ownSub.started_at||ownSub.starts_at||null,
-    expiresAt:ownSub.expires_at||null
+    ...normalizeSubscriptionRow(ownSub),
+    price:rolePrice
   };
+  data.profile.subscriptionStatus=subscriptionDisplay(data.subscription||{});
+  data.profile.subscriptionSource=ownSub && Object.keys(ownSub).length ? "Supabase / subscriptions" : "Aucun abonnement Supabase trouvé";
+
   data.commissionTransfers=(ctR.data||[]).map(x=>({id:x.id,date:x.created_at,operator:x.operator,amount:Number(x.amount||0),accountOwnerId:x.account_owner_id,operationId:x.operation_id,source:"Espèces",destination:x.operator}));
 
   data.payments=(payR.data||[]).map(x=>{
