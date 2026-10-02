@@ -1970,8 +1970,12 @@ if(mpSupabase){
           const j=await r.json().catch(()=>({}));
           if(!r.ok)throw new Error(j.error||`Erreur FedaPay (${r.status})`);
           if(!j.payment_url)throw new Error("FedaPay n’a pas fourni de lien de paiement.");
-          if(!j.transaction_id)throw new Error("FedaPay n’a pas fourni l’identifiant de transaction.");
-          sessionStorage.setItem("moneypro_fedapay_transaction_id",String(j.transaction_id));
+          const createdTransactionId = String(
+            j.transaction_id || j.transactionId || j.id || j.transaction?.id || j.data?.id || j.data?.transaction_id || ""
+          ).trim();
+          if(!createdTransactionId)throw new Error("FedaPay n’a pas fourni l’identifiant de transaction.");
+          sessionStorage.setItem("moneypro_fedapay_transaction_id",createdTransactionId);
+          localStorage.setItem("moneypro_fedapay_transaction_id",createdTransactionId);
           window.location.href=j.payment_url;
         }catch(e){
           console.error("MoneyPro FedaPay:",e);
@@ -1987,7 +1991,11 @@ if(mpSupabase){
     if(params.get("fedapay_return")){
       setTimeout(async()=>{
         try{
-          const transactionId=sessionStorage.getItem("moneypro_fedapay_transaction_id");
+          const transactionId = String(
+            params.get("transaction_id") || params.get("transactionId") || params.get("transaction") || params.get("txid") ||
+            sessionStorage.getItem("moneypro_fedapay_transaction_id") ||
+            localStorage.getItem("moneypro_fedapay_transaction_id") || ""
+          ).trim();
           if(!transactionId){alert("Identifiant de transaction FedaPay introuvable. Relancez le paiement.");return;}
           const {data:sessionData,error:sessionError}=await mpSupabase.auth.getSession();
           if(sessionError)throw sessionError;
@@ -1996,11 +2004,12 @@ if(mpSupabase){
           const r=await fetch(MP_SUPABASE_URL+"/functions/v1/fedapay-confirm-payment",{
             method:"POST",
             headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},
-            body:JSON.stringify({transaction_id:transactionId})
+            body:JSON.stringify({transaction_id:transactionId,transactionId:transactionId})
           });
           const j=await r.json().catch(()=>({}));
           if(!r.ok)throw new Error(j.error||`Erreur de confirmation (${r.status})`);
           sessionStorage.removeItem("moneypro_fedapay_transaction_id");
+          localStorage.removeItem("moneypro_fedapay_transaction_id");
           await mpLoadFromSupabase();
           renderAll();
           alert(j.status==="paid"||j.status==="approved"?"Paiement confirmé. Votre abonnement est actif.":"Paiement reçu mais encore en attente de confirmation.");
