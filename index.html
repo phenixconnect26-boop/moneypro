@@ -1151,9 +1151,21 @@ async function mpLoadFromSupabase(){
     }
   }
   const earlyPrice=normalizedAccountType==="merchant" ? (earlySub.everSubscribed?2000:1000) : normalizedAccountType==="agent_attached" ? 500 : 1000;
-  data.subscription={...normalizeSubscriptionRow(earlySub),price:earlyPrice};
+  // Source d'affichage unique : la ligne subscriptions sélectionnée depuis Supabase.
+  // Le trial nouvellement créé (status=trial, expires_at futur) doit remplacer
+  // immédiatement toute ancienne valeur locale/cachée, sans attendre une autre
+  // synchronisation ou une nouvelle navigation.
+  const normalizedOwnSub=normalizeSubscriptionRow(earlySub||{});
+  data.subscription={...normalizedOwnSub,price:earlyPrice};
   data.profile.subscriptionStatus=subscriptionDisplay(data.subscription);
-  data.profile.subscriptionSource=Object.keys(earlySub||{}).length ? "Supabase" : "Supabase : aucune ligne d'abonnement trouvée";
+  data.profile.subscriptionSource=Object.keys(earlySub||{}).length ? "Supabase / subscriptions" : "Supabase : aucune ligne d'abonnement trouvée";
+
+  // Repeindre immédiatement les zones d'abonnement dès que Supabase a répondu.
+  // Cela évite que l'ancien état local reste affiché après la connexion.
+  if(document.getElementById("app") && !document.getElementById("app").classList.contains("hidden")){
+    try{ renderSubscription(); renderDashboard(); loadSettings(); applyAgentOperationLock(); }
+    catch(e){ console.warn("MoneyPro: rafraîchissement abonnement",e); }
+  }
 
   const payQ=isIndependentAgent?mpSupabase.from("subscription_payments").select("*").eq("account_id",u.id).order("created_at",{ascending:false}):mpSupabase.from("subscription_payments").select("*").eq("merchant_id",merchantId).order("created_at",{ascending:false});
   const ctQ=isIndependentAgent?mpSupabase.from("commission_transfers").select("*").eq("account_owner_id",u.id).order("created_at",{ascending:false}):mpSupabase.from("commission_transfers").select("*").eq("merchant_id",merchantId).order("created_at",{ascending:false});
