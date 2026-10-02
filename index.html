@@ -357,11 +357,14 @@ function mpAccountType(){
    Aucun choix local ne peut déterminer le type de compte ou son tarif. */
 function mpAccountKind(){
   // Source de vérité : role + account_type Supabase.
-  // merchant_id ne doit jamais décider du tarif ou du type d'offre.
+  // account_type est prioritaire pour distinguer les deux types d'agents.
+  // merchant_id ne décide JAMAIS du tarif ou de l'offre.
   const role=mpRole(), type=mpAccountType();
   if(role==="merchant" && type==="merchant") return "merchant";
-  if(role==="agent" && type==="agent_attached") return "agent_attached";
-  if(role==="agent_independent" && type==="agent_independent") return "agent_independent";
+  if(type==="agent_attached" && role==="agent") return "agent_attached";
+  // Selon les anciens profils, un agent indépendant peut avoir role="agent"
+  // tout en ayant account_type="agent_independent". Ce cas reste indépendant.
+  if(type==="agent_independent" && (role==="agent" || role==="agent_independent")) return "agent_independent";
   return null;
 }
 function isMerchantRole(){ return mpAccountKind()==="merchant"; }
@@ -641,10 +644,10 @@ function renderDashboard(){
 }
 let selectedSubscriptionOffer = null;
 function subscriptionOfferForCurrentAccount(){
- const role=mpRole(), type=mpAccountType();
- if(role==="merchant" && type==="merchant") return "merchant";
- if(role==="agent" && type==="agent_attached") return "agent_attached";
- if(role==="agent_independent" && type==="agent_independent") return "agent_independent";
+ const kind=mpAccountKind();
+ if(kind==="merchant") return "merchant";
+ if(kind==="agent_attached") return "agent_attached";
+ if(kind==="agent_independent") return "agent_independent";
  return null;
 }
 function selectSubscriptionOffer(kind){
@@ -674,11 +677,9 @@ function validateSelectedSubscriptionOffer(){
 }
 
 function renderSubscription(){
- const role=mpRole(),accountType=mpAccountType();
- const validRole=(role==="merchant"&&accountType==="merchant")
-   ||(role==="agent"&&accountType==="agent_attached")
-   ||(role==="agent_independent"&&accountType==="agent_independent");
- const isAgent=role==="agent"||role==="agent_independent";
+ const role=mpRole(),accountType=mpAccountType(),kind=mpAccountKind();
+ const validRole=kind!==null;
+ const isAgent=kind==="agent_attached"||kind==="agent_independent";
  const a=getCurrentAgent();
  const s=isAgent?(a?.subscription||data.subscription||{status:"inactive",everSubscribed:false,expiresAt:null})
    :(data.subscription||{status:"inactive",everSubscribed:false,expiresAt:null});
@@ -707,7 +708,7 @@ function renderSubscription(){
 
  const action=document.getElementById("subAction");
  if(action){
-   action.style.display="";
+   action.style.display="inline-flex";
    action.textContent="Continuer vers FedaPay";
    action.disabled=false;
    action.style.opacity="1";
