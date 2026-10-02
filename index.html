@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b1020">
-<title>MoneyPro V1.3 — Gestion Mobile Money</title>
+<title>MoneyPro V1.2 — Gestion Mobile Money</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{--bg:#f4f6fa;--card:#fff;--ink:#101828;--muted:#667085;--line:#e4e7ec;--blue:#155eef;--blue2:#0b4acb;--green:#12b76a;--red:#f04438;--orange:#f79009;--nav:#0b1020;--shadow:0 10px 30px #10182812}
@@ -27,7 +27,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:
 <!-- AUTHENTIFICATION -->
 <div id="authScreen" class="auth">
   <div class="auth-card">
-    <div class="logo">Money<span>Pro</span> <small style="font-size:13px;color:#667085;font-weight:800">V1.3</small></div>
+    <div class="logo">Money<span>Pro</span> <small style="font-size:13px;color:#667085;font-weight:800">V1.2</small></div>
     <h1 id="authTitle">Créer votre compte</h1>
     <p id="authSubtitle">Gérez vos opérations Mobile Money, votre caisse et votre stock.</p>
 
@@ -85,7 +85,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:
 <!-- APPLICATION -->
 <div id="app" class="app hidden">
 <aside id="sidebar" class="sidebar">
-  <div class="brand">Money<span>Pro</span> <small style="font-size:11px;color:#9dbfff;font-weight:800">V1.3</small></div>
+  <div class="brand">Money<span>Pro</span> <small style="font-size:11px;color:#9dbfff;font-weight:800">V1.2</small></div>
   <div class="user-mini"><b id="sideName">Marchand</b><span id="sideRole">Marchand</span></div>
   <nav class="nav">
     <button data-page="dashboard" class="active">📊 Tableau de bord</button>
@@ -191,7 +191,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:
 
 <section id="subscription" class="page">
 <div class="grid sections">
-<div class="subscription"><div class="muted" style="font-size:11px" id="subLabel">ABONNEMENT</div><div style="font-size:28px;font-weight:900;margin:8px 0" id="subPrice">—</div><div id="subState"></div><div class="muted" id="subExpires" style="margin-top:8px"></div><div class="muted" id="subRemaining" style="margin-top:4px"></div><button id="subAction" class="btn" style="display:none;margin-top:16px;background:#fff;color:#155eef" onclick="startSubscription('merchant')">S'abonner via FedaPay</button></div>
+<div class="subscription"><div class="muted" style="font-size:11px" id="subLabel">ABONNEMENT</div><div style="font-size:28px;font-weight:900;margin:8px 0" id="subPrice">—</div><div id="subState"></div><div class="muted" id="subExpires" style="margin-top:8px"></div><div class="muted" id="subRemaining" style="margin-top:4px"></div><button id="subAction" class="btn" style="display:none;margin-top:16px;background:#fff;color:#155eef" onclick="startSubscription()">Continuer vers FedaPay</button></div>
 <div class="card" id="subscriptionPricing"><h2>Tarification</h2>
 <div id="subscriptionOfferSelector" class="grid" style="margin-top:14px;gap:12px">
 <label id="planMerchant" class="plan pricing-plan subscription-offer" data-offer="merchant" onclick="selectSubscriptionOffer('merchant')">
@@ -227,7 +227,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:
 
 <script>
 /*
- MONEYPRO V1.3 — ARCHITECTURE PRÊTE POUR FEDAPAY
+ MONEYPRO V1.2 — ARCHITECTURE PRÊTE POUR FEDAPAY
 
  La connexion sécurisée est activée.
  Quand le projet sera créé :
@@ -356,15 +356,24 @@ function mpAccountType(){
 /* Source de vérité unique : rôle + account_type provenant de Supabase.
    Aucun choix local ne peut déterminer le type de compte ou son tarif. */
 function mpAccountKind(){
-  // Source de vérité : role + account_type Supabase.
-  // account_type est prioritaire pour distinguer les deux types d'agents.
-  // merchant_id ne décide JAMAIS du tarif ou de l'offre.
-  const role=mpRole(), type=mpAccountType();
-  if(role==="merchant" && type==="merchant") return "merchant";
-  if(type==="agent_attached" && role==="agent") return "agent_attached";
-  // Selon les anciens profils, un agent indépendant peut avoir role="agent"
-  // tout en ayant account_type="agent_independent". Ce cas reste indépendant.
-  if(type==="agent_independent" && (role==="agent" || role==="agent_independent")) return "agent_independent";
+  // Source de vérité : le profil Supabase. On accepte les anciennes valeurs
+  // équivalentes pour éviter qu'un ancien profil perde son offre ou son bouton FedaPay.
+  const role=String(mpRole()||"").trim().toLowerCase();
+  const type=String(mpAccountType()||"").trim().toLowerCase();
+  const merchantId=data.profile?.merchant_id||null;
+
+  if(role==="merchant" && (type==="merchant" || !type)) return "merchant";
+
+  const attachedTypes=new Set(["agent_attached","attached_agent","agent_rattache","agent_rattaché","attached"]);
+  const independentTypes=new Set(["agent_independent","independent_agent","agent_independant","agent_indépendant","independent"]);
+
+  if(role==="agent_independent" || independentTypes.has(type)) return "agent_independent";
+  if(role==="agent" && attachedTypes.has(type)) return "agent_attached";
+
+  // Compatibilité des anciens profils : role=agent + account_type=agent.
+  // merchant_id présent => rattaché ; absent => indépendant.
+  if(role==="agent" && (type==="agent" || type==="")) return merchantId ? "agent_attached" : "agent_independent";
+
   return null;
 }
 function isMerchantRole(){ return mpAccountKind()==="merchant"; }
@@ -698,7 +707,7 @@ function renderSubscription(){
    subExpires.textContent="";
    subRemaining.textContent="";
    const action=document.getElementById("subAction");
-   if(action){action.style.display="none";action.disabled=true;}
+   if(action){action.style.display="none";action.hidden=true;action.disabled=true;}
    paymentsTable.innerHTML=`<tr><td colspan="5" class="empty">Chargement du type de compte…</td></tr>`;
    return;
  }
@@ -709,6 +718,7 @@ function renderSubscription(){
  const action=document.getElementById("subAction");
  if(action){
    action.style.display="inline-flex";
+   action.hidden=false;
    action.textContent="Continuer vers FedaPay";
    action.disabled=false;
    action.style.opacity="1";
@@ -873,14 +883,35 @@ async function mpLoadFromSupabase(){
   const me=await mpProfile(u.id);
   // role et account_type viennent exclusivement de Supabase.
   // Aucun sélecteur local ne peut déterminer l'offre.
-  const normalizedAccountType=me.role==="merchant" ? "merchant"
-    : me.role==="agent_independent" ? "agent_independent"
-    : (me.role==="agent" && me.merchant_id) ? "agent_attached"
-    : (me.account_type||null);
+  const rawRole=String(me.role||"").trim().toLowerCase();
+  const rawType=String(me.account_type||"").trim().toLowerCase();
+  const attachedTypes=["agent_attached","attached_agent","agent_rattache","agent_rattaché","attached"];
+  const independentTypes=["agent_independent","independent_agent","agent_independant","agent_indépendant","independent"];
+  let normalizedAccountType=null;
+  if(rawRole==="merchant") normalizedAccountType="merchant";
+  else if(rawRole==="agent_independent" || independentTypes.includes(rawType)) normalizedAccountType="agent_independent";
+  else if(rawRole==="agent" && attachedTypes.includes(rawType)) normalizedAccountType="agent_attached";
+  else if(rawRole==="agent" && (rawType==="agent" || rawType==="")) normalizedAccountType=me.merchant_id?"agent_attached":"agent_independent";
+  else if(rawType==="merchant") normalizedAccountType="merchant";
   if(!normalizedAccountType) throw new Error("Profil Supabase sans role/account_type valide.");
   me.account_type=normalizedAccountType;
-  const merchantId=me.role==="merchant"?me.id:(me.merchant_id||null);
-  const isIndependentAgent=me.role==="agent_independent";
+  const merchantId=normalizedAccountType==="merchant"?me.id:(me.merchant_id||null);
+  const isIndependentAgent=normalizedAccountType==="agent_independent";
+  // Rendre immédiatement le type Supabase disponible : même si une autre
+  // requête de synchronisation échoue, l'écran Abonnement connaît déjà le compte.
+  me.account_type=normalizedAccountType;
+  data.profile={
+    id:u.id,
+    role:me.role,
+    account_type:normalizedAccountType,
+    merchant_id:me.merchant_id||null,
+    shopName:me.shop_name||"",
+    name:mpProfileName(me),
+    phone:me.phone||"",
+    email:me.email||u.email||"",
+    note:me.note||"",
+    merchantContactPhone:me.merchant_contact_phone||""
+  };
 
   const walletQ=mpSupabase.from("wallets").select("*").eq("profile_id",u.id);
   const opQ=isIndependentAgent?mpSupabase.from("operations").select("*").eq("account_owner_id",u.id).order("created_at",{ascending:false}):mpSupabase.from("operations").select("*").eq("merchant_id",merchantId).order("created_at",{ascending:false});
@@ -978,11 +1009,11 @@ async function mpLoadFromSupabase(){
     };
   });
 
-  const ownSub=findSub(u.id,me.role==="agent"?"agent":"merchant")||{};
+  const ownSub=findSub(u.id,normalizedAccountType==="merchant"?"merchant":"agent")||{};
   const ownProfile={
     id:u.id,
     role:me.role,
-    account_type:me.account_type|| (me.role==="merchant"?"merchant":me.role==="agent_independent"?"agent_independent":"agent_attached"),
+    account_type:normalizedAccountType,
     merchant_id:me.merchant_id||null,
     shopName:me.shop_name||merchantProfileRow?.shop_name||"",
     name:mpProfileName(me),
