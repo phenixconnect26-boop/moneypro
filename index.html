@@ -1970,6 +1970,8 @@ if(mpSupabase){
           const j=await r.json().catch(()=>({}));
           if(!r.ok)throw new Error(j.error||`Erreur FedaPay (${r.status})`);
           if(!j.payment_url)throw new Error("FedaPay n’a pas fourni de lien de paiement.");
+          if(!j.transaction_id)throw new Error("FedaPay n’a pas fourni l’identifiant de transaction.");
+          sessionStorage.setItem("moneypro_fedapay_transaction_id",String(j.transaction_id));
           window.location.href=j.payment_url;
         }catch(e){
           console.error("MoneyPro FedaPay:",e);
@@ -1983,7 +1985,30 @@ if(mpSupabase){
   document.addEventListener("DOMContentLoaded",async()=>{
     const params=new URLSearchParams(location.search);
     if(params.get("fedapay_return")){
-      setTimeout(async()=>{try{await mpLoadFromSupabase();renderAll();const st=params.get("status");alert(st==="approved"?"Paiement reçu. L’activation est confirmée par FedaPay et le serveur.":"Paiement terminé ou en attente de confirmation. Actualisez votre espace dans quelques secondes.");}catch(e){console.error(e);}},600);
+      setTimeout(async()=>{
+        try{
+          const transactionId=sessionStorage.getItem("moneypro_fedapay_transaction_id");
+          if(!transactionId){alert("Identifiant de transaction FedaPay introuvable. Relancez le paiement.");return;}
+          const {data:sessionData,error:sessionError}=await mpSupabase.auth.getSession();
+          if(sessionError)throw sessionError;
+          const token=sessionData?.session?.access_token;
+          if(!token)throw new Error("Session Supabase absente. Reconnectez-vous puis réessayez.");
+          const r=await fetch(MP_SUPABASE_URL+"/functions/v1/fedapay-confirm-payment",{
+            method:"POST",
+            headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},
+            body:JSON.stringify({transaction_id:transactionId})
+          });
+          const j=await r.json().catch(()=>({}));
+          if(!r.ok)throw new Error(j.error||`Erreur de confirmation (${r.status})`);
+          sessionStorage.removeItem("moneypro_fedapay_transaction_id");
+          await mpLoadFromSupabase();
+          renderAll();
+          alert(j.status==="paid"||j.status==="approved"?"Paiement confirmé. Votre abonnement est actif.":"Paiement reçu mais encore en attente de confirmation.");
+        }catch(e){
+          console.error("MoneyPro FedaPay confirmation:",e);
+          alert(e?.message||String(e));
+        }
+      },600);
     }
   });
 
