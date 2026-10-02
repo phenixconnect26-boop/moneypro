@@ -620,11 +620,11 @@ function roleDisplayLabel(role,accountType,merchantId){
 function normalizeSubscriptionRow(row){
  const r=row||{};
  const status=String(r.status||"").trim().toLowerCase();
- const explicitTrial = r.is_trial===true || r.trial===true || ["trial","essai","free_trial"].includes(status);
- const everSubscribed = !!r.ever_subscribed || ["paid","active_paid","approved","successful","success","renewed"].includes(status) || (!!r.paid_at && !explicitTrial);
- const expiresAt = r.expires_at || r.trial_ends_at || r.trial_expires_at || r.current_period_end || r.ends_at || r.end_at || null;
- const trialEndsAt = r.trial_ends_at || r.trial_expires_at || (explicitTrial?expiresAt:null);
- const trialUsed = !!r.trial_used || !!r.trial_started_at || !!r.trial_start_at || !!r.trial_ends_at || !!r.trial_expires_at || (!everSubscribed && !!expiresAt && new Date(expiresAt)<=new Date());
+ const explicitTrial = r.is_trial===true || r.trial===true || ["trial","trialing","essai","free_trial"].includes(status);
+ const everSubscribed = !explicitTrial && (!!r.ever_subscribed || ["paid","active_paid","approved","successful","success","renewed"].includes(status) || !!r.paid_at);
+ const expiresAt = r.expires_at || r.trial_ends_at || r.trial_expires_at || r.trial_end_at || r.trial_end || r.current_period_end || r.ends_at || r.end_at || null;
+ const trialEndsAt = r.trial_ends_at || r.trial_expires_at || r.trial_end_at || r.trial_end || (explicitTrial?expiresAt:null);
+ const trialUsed = !!r.trial_used || !!r.trial_started_at || !!r.trial_start_at || !!r.trial_ends_at || !!r.trial_expires_at || !!r.trial_end_at || !!r.trial_end || (!everSubscribed && !!expiresAt && new Date(expiresAt)<=new Date());
  return {
    ...r,
    status:status||"inactive",
@@ -655,7 +655,7 @@ function subscriptionDisplay(s){
  const expiry=x.expiresAt?new Date(x.expiresAt):null;
  const validExpiry=expiry&&!Number.isNaN(expiry.getTime());
  const future=validExpiry && expiry>now;
- const trialState=x.isTrial===true || ["trial","essai","free_trial"].includes(x.status);
+ const trialState=x.isTrial===true || ["trial","trialing","essai","free_trial"].includes(x.status);
  const paid=x.everSubscribed===true && !trialState;
  const paidActive=paid && ["active","paid","approved","successful","success","renewed","active_paid"].includes(x.status) && (!validExpiry || future);
  const trial=trialState && future && !paid;
@@ -1017,18 +1017,25 @@ async function mpLoadFromSupabase(){
   // Ainsi une erreur sur les opérations, stocks ou journées ne peut plus faire
   // disparaître l'état réel de l'abonnement.
   let subR;
-  if(isIndependentAgent){
-    subR=await mpSupabase.from("subscriptions").select("*").eq("account_id",u.id).order("created_at",{ascending:false});
-  }else if(normalizedAccountType==="merchant"){
-    subR=await mpSupabase.from("subscriptions").select("*").eq("merchant_id",u.id).order("created_at",{ascending:false});
+  // L'abonnement propre au compte doit être recherché par son propriétaire.
+  // Ne jamais utiliser merchant_id pour un agent : cela pourrait charger
+  // l'abonnement du marchand et laisser l'agent sans état réel.
+  if(normalizedAccountType==="merchant"){
+    subR=await mpSupabase.from("subscriptions").select("*").or(`account_id.eq.${u.id},profile_id.eq.${u.id},merchant_id.eq.${u.id}`).order("created_at",{ascending:false});
   }else{
-    subR=await mpSupabase.from("subscriptions").select("*").eq("account_id",u.id).order("created_at",{ascending:false});
-    if(subR.error || !(subR.data||[]).length){
-      subR=await mpSupabase.from("subscriptions").select("*").eq("merchant_id",merchantId).order("created_at",{ascending:false});
-    }
+    subR=await mpSupabase.from("subscriptions").select("*").or(`account_id.eq.${u.id},profile_id.eq.${u.id}`).order("created_at",{ascending:false});
   }
   if(subR.error)throw subR.error;
-  const subscriptionRows=(subR.data||[]).map(normalizeSubscriptionRow);
+  let rawSubscriptionRows=subR.data||[];
+  if(!rawSubscriptionRows.length){
+    // Compatibilité avec les anciennes lignes qui rattachent l'abonnement
+    // directement à l'identifiant utilisateur. Cette requête est optionnelle.
+    try{
+      const legacySub=await mpSupabase.from("subscriptions").select("*").eq("user_id",u.id).order("created_at",{ascending:false});
+      if(!legacySub.error) rawSubscriptionRows=legacySub.data||[];
+    }catch(_e){}
+  }
+  const subscriptionRows=rawSubscriptionRows.map(normalizeSubscriptionRow);
 
   const payQ=isIndependentAgent?mpSupabase.from("subscription_payments").select("*").eq("account_id",u.id).order("created_at",{ascending:false}):mpSupabase.from("subscription_payments").select("*").eq("merchant_id",merchantId).order("created_at",{ascending:false});
   const ctQ=isIndependentAgent?mpSupabase.from("commission_transfers").select("*").eq("account_owner_id",u.id).order("created_at",{ascending:false}):mpSupabase.from("commission_transfers").select("*").eq("merchant_id",merchantId).order("created_at",{ascending:false});
@@ -1075,10 +1082,15 @@ async function mpLoadFromSupabase(){
   data.merchantWallets=mpWalletsFromRows(merchantWalletRows);
 
   const findSub=(accountId,type)=>{
-    const rows=subscriptionRows.filter(s=>
-      (s.account_id===accountId||s.profile_id===accountId) &&
-      (!type||s.subscriber_type===type)
-    );
+    const wanted=String(type||"").toLowerCase();
+    const rows=subscriptionRows.filter(s=>{
+      if(!(s.account_id===accountId||s.profile_id===accountId)) return false;
+      if(!wanted) return true;
+      const st=String(s.subscriber_type||s.account_type||s.role||"").trim().toLowerCase();
+      if(wanted==="merchant") return ["merchant","marchand"].includes(st);
+      if(wanted==="agent") return ["agent","agent_attached","attached_agent","agent_rattache","agent_rattaché","agent_independent","independent_agent","agent_independant","agent_indépendant","independent"].includes(st);
+      return true;
+    });
     return pickSubscriptionRow(rows);
   };
   const findDay=accountId=>agentDayRows.find(d=>d.profile_id===accountId)||null;
@@ -1117,7 +1129,7 @@ async function mpLoadFromSupabase(){
     };
   });
 
-  const ownSub=findSub(u.id,normalizedAccountType==="merchant"?"merchant":"agent")||{};
+  const ownSub=findSub(u.id,normalizedAccountType==="merchant"?"merchant":"agent") || pickSubscriptionRow(subscriptionRows.filter(s=>s.account_id===u.id||s.profile_id===u.id||s.user_id===u.id)) || {};
   const ownProfile={
     id:u.id,
     role:me.role,
