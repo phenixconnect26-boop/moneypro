@@ -191,7 +191,7 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:
 
 <section id="subscription" class="page">
 <div class="grid sections">
-<div class="subscription"><div class="muted" style="font-size:11px" id="subLabel">ABONNEMENT</div><div style="font-size:28px;font-weight:900;margin:8px 0" id="subPrice">—</div><div id="subState"></div><div class="muted" id="subExpires" style="margin-top:8px"></div><div class="muted" id="subRemaining" style="margin-top:4px"></div><button id="subAction" class="btn" style="display:none;margin-top:16px;background:#fff;color:#155eef" onclick="startSubscription()">Continuer vers FedaPay</button></div>
+<div class="subscription"><div class="muted" style="font-size:11px" id="subLabel">ABONNEMENT</div><div style="font-size:28px;font-weight:900;margin:8px 0" id="subPrice">—</div><div id="subState"></div><div class="muted" id="subExpires" style="margin-top:8px"></div><div class="muted" id="subRemaining" style="margin-top:4px"></div><button id="subAction" class="btn" style="display:inline-flex;margin-top:16px;background:#fff;color:#155eef" onclick="startSubscription()">Continuer vers FedaPay</button></div>
 <div class="card" id="subscriptionPricing"><h2>Tarification</h2>
 <div id="subscriptionOfferSelector" class="grid" style="margin-top:14px;gap:12px">
 <label id="planMerchant" class="plan pricing-plan subscription-offer" data-offer="merchant" onclick="selectSubscriptionOffer('merchant')">
@@ -356,24 +356,25 @@ function mpAccountType(){
 /* Source de vérité unique : rôle + account_type provenant de Supabase.
    Aucun choix local ne peut déterminer le type de compte ou son tarif. */
 function mpAccountKind(){
-  // Source de vérité : le profil Supabase. On accepte les anciennes valeurs
-  // équivalentes pour éviter qu'un ancien profil perde son offre ou son bouton FedaPay.
+  // Source de vérité : role + account_type provenant du profil Supabase.
+  // Les anciennes variantes de libellés sont normalisées ici pour éviter
+  // qu'un compte valide perde son offre ou son bouton FedaPay.
   const role=String(mpRole()||"").trim().toLowerCase();
   const type=String(mpAccountType()||"").trim().toLowerCase();
   const merchantId=data.profile?.merchant_id||null;
 
-  if(role==="merchant" && (type==="merchant" || !type)) return "merchant";
-
+  const merchantRoles=new Set(["merchant","marchand"]);
+  const attachedRoles=new Set(["agent","agent_attached","agent_rattache","agent_rattaché","attached_agent"]);
+  const independentRoles=new Set(["agent_independent","agent_independant","agent_indépendant","independent_agent","independent"]);
+  const merchantTypes=new Set(["merchant","marchand"]);
   const attachedTypes=new Set(["agent_attached","attached_agent","agent_rattache","agent_rattaché","attached"]);
-  const independentTypes=new Set(["agent_independent","independent_agent","agent_independant","agent_indépendant","independent"]);
+  const independentTypes=new Set(["agent_independent","agent_independant","agent_indépendant","independent_agent","independent"]);
 
-  if(role==="agent_independent" || independentTypes.has(type)) return "agent_independent";
-  if(role==="agent" && attachedTypes.has(type)) return "agent_attached";
-
-  // Compatibilité des anciens profils : role=agent + account_type=agent.
-  // merchant_id présent => rattaché ; absent => indépendant.
-  if(role==="agent" && (type==="agent" || type==="")) return merchantId ? "agent_attached" : "agent_independent";
-
+  if(independentRoles.has(role) || independentTypes.has(type)) return "agent_independent";
+  if(merchantRoles.has(role) || merchantTypes.has(type)) return "merchant";
+  if(attachedTypes.has(type)) return "agent_attached";
+  if(attachedRoles.has(role) && type==="agent") return merchantId ? "agent_attached" : "agent_independent";
+  if(role==="agent" && !type) return merchantId ? "agent_attached" : "agent_independent";
   return null;
 }
 function isMerchantRole(){ return mpAccountKind()==="merchant"; }
@@ -686,55 +687,74 @@ function validateSelectedSubscriptionOffer(){
 }
 
 function renderSubscription(){
- const role=mpRole(),accountType=mpAccountType(),kind=mpAccountKind();
- const validRole=kind!==null;
+ const kind=mpAccountKind();
  const isAgent=kind==="agent_attached"||kind==="agent_independent";
  const a=getCurrentAgent();
  const s=isAgent?(a?.subscription||data.subscription||{status:"inactive",everSubscribed:false,expiresAt:null})
-   :(data.subscription||{status:"inactive",everSubscribed:false,expiresAt:null});
+   :(kind==="merchant"?(data.subscription||{status:"inactive",everSubscribed:false,expiresAt:null}):{status:"inactive",everSubscribed:false,expiresAt:null});
  const price=currentSubscriptionPrice();
+ const action=document.getElementById("subAction");
+ const msg=document.getElementById("subscriptionOfferMessage");
+ const valid=kind==="merchant"||kind==="agent_attached"||kind==="agent_independent";
 
- // Les 3 offres sont toujours visibles. La sélection reste libre dans l'interface,
- // mais le contrôle Supabase bloque toute offre incompatible avant FedaPay.
- document.getElementById("planMerchant")?.style.setProperty("display","block");
- document.getElementById("planAttachedAgent")?.style.setProperty("display","block");
- document.getElementById("planIndependentAgent")?.style.setProperty("display","block");
+ // Les trois offres restent toujours visibles. Le bouton FedaPay reste
+ // présent lui aussi : il est seulement désactivé si le type Supabase est
+ // réellement inconnu. Cela évite qu'un problème de rendu fasse disparaître
+ // le seul point d'accès au paiement.
+ ["planMerchant","planAttachedAgent","planIndependentAgent"].forEach(id=>{
+   const el=document.getElementById(id);
+   if(el)el.style.setProperty("display","block","important");
+ });
 
- if(!validRole || price===null){
+ if(action){
+   action.hidden=false;
+   action.style.setProperty("display","inline-flex","important");
+   action.textContent="Continuer vers FedaPay";
+ }
+
+ if(!valid || price===null){
    selectedSubscriptionOffer=null;
    subPrice.textContent="—";
    subState.innerHTML="";
    subExpires.textContent="";
    subRemaining.textContent="";
-   const action=document.getElementById("subAction");
-   if(action){action.style.display="none";action.hidden=true;action.disabled=true;}
-   paymentsTable.innerHTML=`<tr><td colspan="5" class="empty">Chargement du type de compte…</td></tr>`;
-   return;
+   if(msg){msg.textContent="Type de compte Supabase non reconnu. Le paiement FedaPay est temporairement désactivé.";msg.classList.add("warning");}
+   if(action){
+     action.disabled=true;
+     action.style.opacity=".65";
+     action.onclick=()=>{};
+   }
+ }else{
+   const expected=kind;
+   if(selectedSubscriptionOffer!==expected)selectSubscriptionOffer(expected);
+   subPrice.textContent=money(price)+" / mois";
+   const v=subscriptionDisplay(s);
+   subState.innerHTML=`<span class="badge ${v.badge}">${v.label}</span>`;
+   subExpires.textContent=v.date||"";
+   subRemaining.textContent=v.remaining||"";
+   if(msg){
+     const labels={merchant:"Marchand",agent_attached:"Agent rattaché",agent_independent:"Agent indépendant"};
+     msg.textContent=`Offre sélectionnée : ${labels[expected]}. Le type de compte Supabase sera contrôlé avant l'accès à FedaPay.`;
+     msg.classList.remove("warning");
+   }
+   if(action){
+     action.disabled=false;
+     action.style.opacity="1";
+     action.onclick=async()=>{
+       try{
+         validateSelectedSubscriptionOffer();
+         // Abonnement personnel : aucun agentId n'est transmis.
+         // Seul le marchand peut transmettre un agentId depuis Gestion des agents.
+         await startSubscription(expected==="merchant"?"merchant":"agent",null);
+       }catch(e){
+         const text=e?.message||String(e);
+         if(msg){msg.textContent=text;msg.classList.add("warning");}
+         alert(text);
+       }
+     };
+   }
  }
 
- const expected=subscriptionOfferForCurrentAccount();
- if(selectedSubscriptionOffer===null || selectedSubscriptionOffer!==expected) selectSubscriptionOffer(expected);
-
- const action=document.getElementById("subAction");
- if(action){
-   action.style.display="inline-flex";
-   action.hidden=false;
-   action.textContent="Continuer vers FedaPay";
-   action.disabled=false;
-   action.style.opacity="1";
-   action.onclick=async()=>{
-     try{
-       validateSelectedSubscriptionOffer();
-       // Le montant réel reste déterminé par le type de compte Supabase.
-       await startSubscription(expected==="merchant"?"merchant":"agent", expected==="agent_attached" && isMerchantRole()?null:(expected==="merchant"||isAgent)?(getCurrentAgent()?.id||null):null);
-     }catch(e){
-       const msg=document.getElementById("subscriptionOfferMessage");
-       if(msg){msg.textContent=e?.message||String(e);msg.classList.add("warning");}
-       alert(e?.message||String(e));
-     }
-   };
- }
- renderSubscriptionSummary("subscription",s,price,isAgent);
  const rows=data.payments.filter(p=>!isAgent||p.agentId===a?.id);
  paymentsTable.innerHTML=rows.length?rows.map(p=>{const ps=paymentStatusDisplay(p.status);return `<tr><td>${fmt(p.date)}</td><td>${esc(p.account)}</td><td>${money(p.amount)}</td><td><span class="badge ${ps[1]}">${esc(ps[0])}</span></td><td>${esc(p.reference)}</td></tr>`}).join(""):`<tr><td colspan="5" class="empty">Aucun paiement.</td></tr>`;
 }
@@ -888,8 +908,9 @@ async function mpLoadFromSupabase(){
   const attachedTypes=["agent_attached","attached_agent","agent_rattache","agent_rattaché","attached"];
   const independentTypes=["agent_independent","independent_agent","agent_independant","agent_indépendant","independent"];
   let normalizedAccountType=null;
-  if(rawRole==="merchant") normalizedAccountType="merchant";
-  else if(rawRole==="agent_independent" || independentTypes.includes(rawType)) normalizedAccountType="agent_independent";
+  if(["merchant","marchand"].includes(rawRole) || ["merchant","marchand"].includes(rawType)) normalizedAccountType="merchant";
+  else if(["agent_independent","agent_independant","agent_indépendant","independent_agent","independent"].includes(rawRole) || independentTypes.includes(rawType)) normalizedAccountType="agent_independent";
+  else if(rawRole==="agent" && independentTypes.includes(rawType)) normalizedAccountType="agent_independent";
   else if(rawRole==="agent" && attachedTypes.includes(rawType)) normalizedAccountType="agent_attached";
   else if(rawRole==="agent" && (rawType==="agent" || rawType==="")) normalizedAccountType=me.merchant_id?"agent_attached":"agent_independent";
   else if(rawType==="merchant") normalizedAccountType="merchant";
@@ -1606,9 +1627,9 @@ if(mpSupabase){
   startSubscription=async function(kind,agentId=null){
     try{
       const callerRole=mpRole(), callerType=mpAccountType();
-      const callerIsMerchant=isMerchantRole();
-      const callerIsAttached=isAttachedAgentRole();
-      const callerIsIndependent=isIndependentAgentRole();
+      const callerIsMerchant=mpAccountKind()==="merchant";
+      const callerIsAttached=mpAccountKind()==="agent_attached";
+      const callerIsIndependent=mpAccountKind()==="agent_independent";
       // Les paiements déclenchés depuis l'écran Abonnement passent par la sélection d'offre.
       // Seule la gestion d'un agent rattaché lancée par le marchand depuis Gestion des agents
       // utilise son propre contexte et ne dépend pas de la sélection ci-dessus.
