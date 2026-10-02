@@ -619,19 +619,31 @@ function roleDisplayLabel(role,accountType,merchantId){
 }
 function normalizeSubscriptionRow(row){
  const r=row||{};
- const status=String(r.status||"").trim().toLowerCase();
+ const status=String(r.status||r.subscription_status||r.trial_status||"").trim().toLowerCase();
  const explicitTrial = r.is_trial===true || r.trial===true || ["trial","trialing","essai","free_trial","free-trial"].includes(status) || String(r.subscription_type||r.plan_type||"").trim().toLowerCase()==="trial";
- const paidMarker = !!r.ever_subscribed || ["paid","active_paid","approved","successful","success","renewed"].includes(status) || !!r.paid_at || !!r.payment_id || !!r.fedapay_transaction_id;
- const everSubscribed = !explicitTrial && paidMarker;
- const expiresAt = r.expires_at || r.expires_on || r.expiration_date || r.subscription_end || r.subscription_ends_at || r.trial_ends_at || r.trial_expires_at || r.trial_end_at || r.trial_end || r.current_period_end || r.ends_at || r.end_at || null;
+ // IMPORTANT : une transaction FedaPay "pending" n'est JAMAIS une preuve de paiement.
+ // Ne jamais considérer un transaction_id/payment_id seul comme un abonnement payé.
+ const paymentConfirmed = ["paid","approved","successful","success","renewed","active_paid","completed"].includes(status)
+   || ((["active"].includes(status)) && (!!r.paid_at || !!r.payment_confirmed_at || !!r.payment_validated_at));
+ const everSubscribedFlag = r.ever_subscribed===true || r.everSubscribed===true;
+ const everSubscribed = paymentConfirmed || everSubscribedFlag;
+ const expiresAt = r.expires_at || r.expires_on || r.expiration_date || r.subscription_end || r.subscription_ends_at || r.subscription_expires_at || r.trial_ends_at || r.trial_expires_at || r.trial_end_at || r.trial_end || r.current_period_end || r.ends_at || r.end_at || null;
  const trialEndsAt = r.trial_ends_at || r.trial_expires_at || r.trial_end_at || r.trial_end || r.trial_expires_on || r.trial_end_date || (explicitTrial?expiresAt:null);
- const trialUsed = r.trial_used===true || !!r.trial_started_at || !!r.trial_start_at || !!r.trial_ends_at || !!r.trial_expires_at || !!r.trial_end_at || !!r.trial_end;
+ const trialUsed = r.trial_used===true || r.trialUsed===true || !!r.trial_started_at || !!r.trial_start_at || !!r.trial_ends_at || !!r.trial_expires_at || !!r.trial_end_at || !!r.trial_end;
+ const expiryMs=expiresAt?new Date(expiresAt).getTime():NaN;
+ const futureExpiry=Number.isFinite(expiryMs) && expiryMs>Date.now();
+ // Un statut pending reste pending tant que FedaPay n'a pas confirmé le paiement.
+ // Mais pendant un essai encore valide, pending ne bloque absolument pas le compte.
+ const pendingDuringTrial=status==="pending" && !everSubscribed && !!trialEndsAt && futureExpiry;
  return {
    ...r,
    status:status||"inactive",
+   paymentConfirmed,
    everSubscribed,
    trial_used:trialUsed,
-   isTrial:explicitTrial || (!everSubscribed && !!trialEndsAt) || (!everSubscribed && status==="active" && !!expiresAt),
+   pendingPayment:status==="pending" && !paymentConfirmed,
+   pendingDuringTrial,
+   isTrial:explicitTrial || (!everSubscribed && !!trialEndsAt) || pendingDuringTrial || (!everSubscribed && status==="active" && !!expiresAt),
    startedAt:r.started_at||r.starts_at||r.paid_at||r.trial_started_at||r.trial_start_at||null,
    expiresAt,
    trialEndsAt
@@ -641,31 +653,47 @@ function pickSubscriptionRow(rows){
  const list=(rows||[]).map(normalizeSubscriptionRow);
  if(!list.length)return {};
  const now=Date.now();
- const live=list.find(s=>{
-   const d=s.expiresAt?new Date(s.expiresAt).getTime():null;
-   const future=d==null || d>now;
-   const trial=s.isTrial===true && future;
-   const paid=s.everSubscribed===true && !s.isTrial && ["active","paid","approved","successful","success","renewed","active_paid"].includes(s.status) && future;
-   return trial||paid;
+ // Priorité 1 : essai encore valide, même si une tentative FedaPay est pending.
+ const liveTrial=list.find(s=>{
+   const d=s.trialEndsAt?s.trialEndsAt:s.expiresAt;
+   const t=d?new Date(d).getTime():NaN;
+   return s.isTrial===true && Number.isFinite(t) && t>now;
  });
- return live||list[0];
+ if(liveTrial)return liveTrial;
+ // Priorité 2 : abonnement réellement confirmé et encore valide.
+ const livePaid=list.find(s=>{
+   const d=s.expiresAt?new Date(s.expiresAt).getTime():NaN;
+   const future=d==null || d>now;
+   const paid=s.paymentConfirmed===true && future;
+   // Après un paiement déjà confirmé, une nouvelle tentative pending ne doit
+   // pas couper l'abonnement actuel tant que sa date d'expiration n'est pas atteinte.
+   const paidPeriod=s.everSubscribed===true && !s.isTrial && future && ["active","paid","approved","successful","success","renewed","active_paid","completed","pending"].includes(s.status);
+   return paid||paidPeriod;
+ });
+ if(livePaid)return livePaid;
+ // Sinon on retourne la ligne la plus récente, qui sera notamment pending.
+ return list[0];
 }
 function subscriptionDisplay(s){
  const x=normalizeSubscriptionRow(s);
  const now=new Date();
  const expiry=x.expiresAt?new Date(x.expiresAt):null;
+ const trialExpiry=x.trialEndsAt?new Date(x.trialEndsAt):expiry;
  const validExpiry=expiry&&!Number.isNaN(expiry.getTime());
+ const validTrialExpiry=trialExpiry&&!Number.isNaN(trialExpiry.getTime());
  const future=validExpiry && expiry>now;
- const trialState=x.isTrial===true || ["trial","trialing","essai","free_trial"].includes(x.status);
- const paid=x.everSubscribed===true && !trialState;
- const paidActive=paid && ["active","paid","approved","successful","success","renewed","active_paid"].includes(x.status) && (!validExpiry || future);
- const trial=trialState && future && !paid;
- if(trial){
-   const ms=Math.max(0,expiry-now); const days=Math.max(0,Math.ceil(ms/86400000));
-   return {key:"trial",label:"Essai",badge:"orange",date:"Essai + "+days+" "+(days===1?"jour":"jours"),remaining:"Lecture + écriture",active:true,canWrite:true,trial:true,trialUsed:false};
+ const trialFuture=validTrialExpiry && trialExpiry>now;
+ const trialState=x.isTrial===true || ["trial","trialing","essai","free_trial","free-trial"].includes(x.status);
+ const paidConfirmed=x.paymentConfirmed===true;
+ const paidPeriod=x.everSubscribed===true && !x.isTrial && future && ["active","paid","approved","successful","success","renewed","active_paid","completed","pending"].includes(x.status);
+ // Règle métier : pending n'annule jamais un trial valide.
+ if(trialFuture && !paidConfirmed && !x.everSubscribed){
+   const ms=Math.max(0,trialExpiry-now); const days=Math.max(0,Math.ceil(ms/86400000));
+   return {key:"trial",label:"Essai",badge:"orange",date:"Essai + "+days+" "+(days===1?"jour":"jours"),remaining:"Lecture + écriture",active:true,canWrite:true,trial:true,trialUsed:false,pending:x.status==="pending"};
  }
- if(paidActive) return {key:"active",label:"Actif",badge:"green",date:validExpiry?"Actif jusqu'au "+fmt(x.expiresAt):"Actif",remaining:"Lecture + écriture",active:true,canWrite:true,trial:false,trialUsed:true};
- return {key:"expired",label:"Expiré",badge:"red",date:"Expiré",remaining:"Lecture seule — abonnement/essai expiré",active:false,canWrite:false,trial:false,trialUsed:!!x.trial_used};
+ if(paidConfirmed || paidPeriod) return {key:"active",label:"Actif",badge:"green",date:validExpiry?"Actif jusqu'au "+fmt(x.expiresAt):"Actif",remaining:"Lecture + écriture",active:true,canWrite:true,trial:false,trialUsed:true};
+ // Une fois le trial expiré, pending reste en attente et le compte passe en lecture seule.
+ return {key:"expired",label:"Expiré",badge:"red",date:x.status==="pending"?"Expiré — paiement en attente":"Expiré",remaining:"Lecture seule — abonnement/essai expiré",active:false,canWrite:false,trial:false,trialUsed:!!x.trial_used,pending:x.status==="pending"};
 }
 function currentSubscriptionState(){
  const kind=mpAccountKind();
@@ -1023,50 +1051,117 @@ async function mpLoadFromSupabase(){
   // les résultats. Le type de compte reste celui du profil Supabase.
   const subscriptionOwnerColumns=["account_id","profile_id","user_id","owner_id","subscriber_id","customer_id","member_id"];
   const subscriptionMap=new Map();
-  for(const col of subscriptionOwnerColumns){
-    try{
-      const q=await mpSupabase.from("subscriptions").select("*").eq(col,u.id);
-      if(!q.error){
-        for(const row of (q.data||[])){
-          const key=String(row.id||row.subscription_id||[row.account_id,row.profile_id,row.user_id,row.owner_id,row.subscriber_id,row.customer_id,row.member_id,row.created_at].join("|"));
-          subscriptionMap.set(key,row);
-        }
-      }
-    }catch(_e){}
-  }
+  const subReads=await Promise.allSettled(subscriptionOwnerColumns.map(col=>
+    mpSupabase.from("subscriptions").select("*").eq(col,u.id)
+  ));
+  subReads.forEach((result,idx)=>{
+    const col=subscriptionOwnerColumns[idx];
+    if(result.status!=="fulfilled"){ console.warn("MoneyPro: lecture subscriptions "+col+" indisponible",result.reason); return; }
+    const q=result.value;
+    if(q.error){ console.warn("MoneyPro: lecture subscriptions "+col+"",q.error); return; }
+    for(const row of (q.data||[])){
+      const key=String(row.id||row.subscription_id||[row.account_id,row.profile_id,row.user_id,row.owner_id,row.subscriber_id,row.customer_id,row.member_id,row.created_at].join("|"));
+      subscriptionMap.set(key,row);
+    }
+  });
   const rawSubscriptionRows=[...subscriptionMap.values()].sort((a,b)=>new Date(b.created_at||b.updated_at||0)-new Date(a.created_at||a.updated_at||0));
   const subscriptionRows=rawSubscriptionRows.map(normalizeSubscriptionRow);
+
+  // Certaines installations de MoneyPro portent l'état de l'essai sur
+  // profiles alors qu'une ligne subscriptions "pending" existe déjà.
+  // Cette ligne pending ne doit jamais masquer l'état réel du profil.
+  const profileSubMeta={};
+  [
+    "status","subscription_status","trial_status","is_trial","trial",
+    "trial_used","trial_started_at","trial_start_at","trial_ends_at",
+    "trial_expires_at","trial_end_at","trial_end","trial_expires_on",
+    "trial_end_date","expires_at","subscription_expires_at",
+    "current_period_end","subscription_type","plan_type",
+    "ever_subscribed","everSubscribed","paid_at","payment_id",
+    "fedapay_transaction_id"
+  ].forEach(k=>{
+    if(me[k]!==undefined && me[k]!==null && me[k]!=="") profileSubMeta[k]=me[k];
+  });
+
+  // IMPORTANT : l'état d'abonnement est une donnée critique et doit être
+  // disponible AVANT les autres requêtes. Une erreur sur wallets, opérations,
+  // paiements, journées, etc. ne doit jamais remettre l'abonnement à "—".
+  // On calcule donc immédiatement l'abonnement du compte courant à partir de
+  // Supabase, puis les autres données sont chargées séparément.
+  const ownCandidatesEarly=subscriptionRows.filter(s=>
+    [s.account_id,s.profile_id,s.user_id,s.owner_id,s.subscriber_id,s.customer_id,s.member_id]
+      .some(v=>String(v||"")===String(u.id))
+  );
+  const findSubEarly=(rows,type)=>{
+    const wanted=String(type||"").toLowerCase();
+    const filtered=(rows||[]).filter(s=>{
+      if(!wanted)return true;
+      const st=String(s.subscriber_type||s.account_type||s.role||"").trim().toLowerCase();
+      if(wanted==="merchant") return ["merchant","marchand"].includes(st);
+      if(wanted==="agent") return ["agent","agent_attached","attached_agent","agent_rattache","agent_rattaché","agent_independent","independent_agent","agent_independant","agent_indépendant","independent"].includes(st);
+      return true;
+    });
+    return pickSubscriptionRow(filtered);
+  };
+  let earlySub=findSubEarly(ownCandidatesEarly,normalizedAccountType==="merchant"?"merchant":"agent");
+  if(!earlySub || !Object.keys(earlySub).length) earlySub=pickSubscriptionRow(ownCandidatesEarly)||{};
+  // Toujours fusionner les métadonnées du profil, même lorsqu'une ligne
+  // subscriptions existe. Ainsi "pending" + essai configuré sur profiles
+  // donne bien l'état d'essai et non un abonnement vide/expiré.
+  if(Object.keys(profileSubMeta).length){
+    earlySub={...earlySub,...profileSubMeta};
+  }
+  const earlyPrice=normalizedAccountType==="merchant" ? (earlySub.everSubscribed?2000:1000) : normalizedAccountType==="agent_attached" ? 500 : 1000;
+  data.subscription={...normalizeSubscriptionRow(earlySub),price:earlyPrice};
+  data.profile.subscriptionStatus=subscriptionDisplay(data.subscription);
+  data.profile.subscriptionSource=Object.keys(earlySub||{}).length ? "Supabase" : "Supabase : aucune ligne d'abonnement trouvée";
 
   const payQ=isIndependentAgent?mpSupabase.from("subscription_payments").select("*").eq("account_id",u.id).order("created_at",{ascending:false}):mpSupabase.from("subscription_payments").select("*").eq("merchant_id",merchantId).order("created_at",{ascending:false});
   const ctQ=isIndependentAgent?mpSupabase.from("commission_transfers").select("*").eq("account_owner_id",u.id).order("created_at",{ascending:false}):mpSupabase.from("commission_transfers").select("*").eq("merchant_id",merchantId).order("created_at",{ascending:false});
   const dayQ=mpSupabase.from("business_days").select("*").eq("profile_id",u.id).eq("status","open").order("opened_at",{ascending:false}).limit(1);
-  const [walletR,opR,expR,prodR,agentR,payR,ctR,dayR]=await Promise.all([walletQ,opQ,expQ,prodQ,agentQ,payQ,ctQ,dayQ]);
-  for(const r of [walletR,opR,expR,prodR,agentR,payR,ctR,dayR])if(r.error)throw r.error;
+  const secondaryResults=await Promise.allSettled([walletQ,opQ,expQ,prodQ,agentQ,payQ,ctQ,dayQ]);
+  const secondaryNames=["wallets","operations","expenses","inventory","agents","payments","commission_transfers","business_days"];
+  secondaryResults.forEach((r,i)=>{
+    if(r.status!=="fulfilled") console.warn("MoneyPro: "+secondaryNames[i]+" indisponible",r.reason);
+    else if(r.value?.error) console.warn("MoneyPro: "+secondaryNames[i]+"",r.value.error);
+  });
+  const emptyResult={data:[],error:null};
+  const [walletR,opR,expR,prodR,agentR,payR,ctR,dayR]=secondaryResults.map(r=>
+    r.status==="fulfilled" && r.value ? r.value : emptyResult
+  );
 
   const agentRows=agentR.data||[];
   const agentIds=agentRows.map(a=>a.id);
-  let dayHistoryR;
-  if(me.role==="merchant"){
-    const ids=[u.id,...agentIds];
-    dayHistoryR=ids.length?await mpSupabase.from("business_days").select("*").in("profile_id",ids).eq("status","closed").order("closed_at",{ascending:false}).limit(100):{data:[],error:null};
-  }else{
-    dayHistoryR=await mpSupabase.from("business_days").select("*").eq("profile_id",u.id).eq("status","closed").order("closed_at",{ascending:false}).limit(30);
-  }
-  if(dayHistoryR.error)throw dayHistoryR.error;
+  let dayHistoryR={data:[],error:null};
+  try{
+    if(me.role==="merchant"){
+      const ids=[u.id,...agentIds];
+      dayHistoryR=ids.length?await mpSupabase.from("business_days").select("*").in("profile_id",ids).eq("status","closed").order("closed_at",{ascending:false}).limit(100):{data:[],error:null};
+    }else{
+      dayHistoryR=await mpSupabase.from("business_days").select("*").eq("profile_id",u.id).eq("status","closed").order("closed_at",{ascending:false}).limit(30);
+    }
+    if(dayHistoryR.error) console.warn("MoneyPro: historique des journées",dayHistoryR.error);
+  }catch(e){ console.warn("MoneyPro: historique des journées indisponible",e); }
   let agentWalletRows=[], agentDayRows=[];
   if(agentIds.length){
-    const [ar,dr]=await Promise.all([
+    const [ar0,dr0]=await Promise.allSettled([
       mpSupabase.from("wallets").select("*").in("profile_id",agentIds),
       mpSupabase.from("business_days").select("*").in("profile_id",agentIds).eq("status","open")
     ]);
-    if(ar.error)throw ar.error;
-    if(dr.error)throw dr.error;
+    const ar=ar0.status==="fulfilled"?ar0.value:{data:[],error:ar0.reason};
+    const dr=dr0.status==="fulfilled"?dr0.value:{data:[],error:dr0.reason};
+    if(ar.error)console.warn("MoneyPro: portefeuilles agents",ar.error);
+    if(dr.error)console.warn("MoneyPro: journées agents",dr.error);
     agentWalletRows=ar.data||[];
     agentDayRows=dr.data||[];
   }
 
   const ownDay=dayR.data?.[0]||null;
-  const merchantProfileRow=isIndependentAgent?null:(me.role==="merchant"?me:await mpProfile(merchantId));
+  let merchantProfileRow=null;
+  if(!isIndependentAgent){
+    try{ merchantProfileRow=me.role==="merchant"?me:await mpProfile(merchantId); }
+    catch(e){ console.warn("MoneyPro: profil marchand indisponible",e); merchantProfileRow=me.role==="merchant"?me:null; }
+  }
   const merchantName=merchantProfileRow?mpProfileName(merchantProfileRow):mpProfileName(me);
 
   data.merchantProfile=merchantProfileRow?{
@@ -1077,7 +1172,10 @@ async function mpLoadFromSupabase(){
   let merchantWalletRows=[];
   if(!isIndependentAgent){
     if(me.role==="merchant") merchantWalletRows=walletR.data||[];
-    else{const mr=await mpSupabase.from("wallets").select("*").eq("profile_id",merchantId);if(mr.error)throw mr.error;merchantWalletRows=mr.data||[];}
+    else{
+      try{const mr=await mpSupabase.from("wallets").select("*").eq("profile_id",merchantId);if(mr.error)console.warn("MoneyPro: portefeuille marchand",mr.error);merchantWalletRows=mr.data||[];}
+      catch(e){console.warn("MoneyPro: portefeuille marchand indisponible",e);merchantWalletRows=[];}
+    }
   }
   data.merchantWallets=mpWalletsFromRows(merchantWalletRows);
 
@@ -1206,11 +1304,9 @@ async function mpLoadFromSupabase(){
   if(rolePrice===null) throw new Error("Type de compte Supabase non pris en charge.");
   // Si le profil porte directement les métadonnées d'essai et qu'aucune ligne
   // d'abonnement exploitable n'a été trouvée, les utiliser comme dernier recours.
-  let resolvedSub=ownSub;
-  if(!resolvedSub || !Object.keys(resolvedSub).length){
-    const profileTrialFields={};
-    ["status","is_trial","trial","trial_used","trial_started_at","trial_start_at","trial_ends_at","trial_expires_at","trial_end_at","trial_end","expires_at","current_period_end"].forEach(k=>{ if(me[k]!==undefined && me[k]!==null) profileTrialFields[k]=me[k]; });
-    if(Object.keys(profileTrialFields).length) resolvedSub=profileTrialFields;
+  let resolvedSub={...(ownSub||{})};
+  if(Object.keys(profileSubMeta).length){
+    resolvedSub={...resolvedSub,...profileSubMeta};
   }
   data.subscription={
     ...normalizeSubscriptionRow(resolvedSub),
@@ -1455,20 +1551,22 @@ function mpRestoreSessionCache(){
     if(!raw)return false;
     const c=JSON.parse(raw);
     if(!c?.profile)return false;
-    Object.assign(data,{
-      profile:c.profile,subscription:c.subscription||data.subscription,
-      wallets:Array.isArray(c.wallets)?c.wallets:data.wallets,
-      merchantProfile:c.merchantProfile||data.merchantProfile,
-      merchantWallets:Array.isArray(c.merchantWallets)?c.merchantWallets:data.merchantWallets,
-      agents:Array.isArray(c.agents)?c.agents:data.agents,
-      operations:Array.isArray(c.operations)?c.operations:data.operations,
-      expenses:Array.isArray(c.expenses)?c.expenses:data.expenses,
-      products:Array.isArray(c.products)?c.products:data.products,
-      payments:Array.isArray(c.payments)?c.payments:data.payments,
-      commissionTransfers:Array.isArray(c.commissionTransfers)?c.commissionTransfers:data.commissionTransfers,
-      dayHistory:Array.isArray(c.dayHistory)?c.dayHistory:data.dayHistory,
-      merchantId:c.merchantId||null
-    });
+    // Le cache ne doit jamais écraser une information fraîchement lue depuis
+    // Supabase. C'était une cause possible du retour de "ABONNEMENT —" après
+    // une erreur secondaire de synchronisation.
+    if(!data.profile?.id && c.profile) data.profile=c.profile;
+    if(!data.subscription || !Object.keys(data.subscription).length) data.subscription=c.subscription||data.subscription;
+    if(!Array.isArray(data.wallets)||!data.wallets.length) data.wallets=Array.isArray(c.wallets)?c.wallets:data.wallets;
+    if(!data.merchantProfile && c.merchantProfile) data.merchantProfile=c.merchantProfile;
+    if(!Array.isArray(data.merchantWallets)||!data.merchantWallets.length) data.merchantWallets=Array.isArray(c.merchantWallets)?c.merchantWallets:data.merchantWallets;
+    if(!Array.isArray(data.agents)||!data.agents.length) data.agents=Array.isArray(c.agents)?c.agents:data.agents;
+    if(!Array.isArray(data.operations)||!data.operations.length) data.operations=Array.isArray(c.operations)?c.operations:data.operations;
+    if(!Array.isArray(data.expenses)||!data.expenses.length) data.expenses=Array.isArray(c.expenses)?c.expenses:data.expenses;
+    if(!Array.isArray(data.products)||!data.products.length) data.products=Array.isArray(c.products)?c.products:data.products;
+    if(!Array.isArray(data.payments)||!data.payments.length) data.payments=Array.isArray(c.payments)?c.payments:data.payments;
+    if(!Array.isArray(data.commissionTransfers)||!data.commissionTransfers.length) data.commissionTransfers=Array.isArray(c.commissionTransfers)?c.commissionTransfers:data.commissionTransfers;
+    if(!Array.isArray(data.dayHistory)||!data.dayHistory.length) data.dayHistory=Array.isArray(c.dayHistory)?c.dayHistory:data.dayHistory;
+    if(!data.merchantId) data.merchantId=c.merchantId||null;
     return true;
   }catch(e){console.warn("MoneyPro: cache locale invalide",e);return false;}
 }
