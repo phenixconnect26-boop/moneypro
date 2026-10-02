@@ -620,21 +620,26 @@ function roleDisplayLabel(role,accountType,merchantId){
 function normalizeSubscriptionRow(row){
  const r=row||{};
  const status=String(r.status||r.subscription_status||r.trial_status||"").trim().toLowerCase();
- const explicitTrial = r.is_trial===true || r.trial===true || ["trial","trialing","essai","free_trial","free-trial"].includes(status) || String(r.subscription_type||r.plan_type||"").trim().toLowerCase()==="trial";
- // IMPORTANT : une transaction FedaPay "pending" n'est JAMAIS une preuve de paiement.
- // Ne jamais considérer un transaction_id/payment_id seul comme un abonnement payé.
- const paymentConfirmed = ["paid","approved","successful","success","renewed","active_paid","completed"].includes(status)
-   || ((["active"].includes(status)) && (!!r.paid_at || !!r.payment_confirmed_at || !!r.payment_validated_at));
- const everSubscribedFlag = r.ever_subscribed===true || r.everSubscribed===true;
- const everSubscribed = paymentConfirmed || everSubscribedFlag;
- const expiresAt = r.expires_at || r.expires_on || r.expiration_date || r.subscription_end || r.subscription_ends_at || r.subscription_expires_at || r.trial_ends_at || r.trial_expires_at || r.trial_end_at || r.trial_end || r.current_period_end || r.ends_at || r.end_at || null;
- const trialEndsAt = r.trial_ends_at || r.trial_expires_at || r.trial_end_at || r.trial_end || r.trial_expires_on || r.trial_end_date || (explicitTrial?expiresAt:null);
- const trialUsed = r.trial_used===true || r.trialUsed===true || !!r.trial_started_at || !!r.trial_start_at || !!r.trial_ends_at || !!r.trial_expires_at || !!r.trial_end_at || !!r.trial_end;
+ const subscriptionType=String(r.subscription_type||r.plan_type||"").trim().toLowerCase();
+ const explicitTrial=r.is_trial===true || r.trial===true || ["trial","trialing","essai","free_trial","free-trial"].includes(status) || subscriptionType==="trial";
+
+ // IMPORTANT : "pending" = tentative de paiement, jamais abonnement payé.
+ // Un payment_id / transaction_id seul ne constitue pas une confirmation.
+ const paymentConfirmed=["paid","approved","successful","success","renewed","active_paid","completed"].includes(status)
+   || (status==="active" && (!!r.paid_at || !!r.payment_confirmed_at || !!r.payment_validated_at));
+ const everSubscribedFlag=r.ever_subscribed===true || r.everSubscribed===true;
+ const everSubscribed=paymentConfirmed || everSubscribedFlag;
+
+ const expiresAt=r.expires_at || r.expires_on || r.expiration_date || r.subscription_end || r.subscription_ends_at || r.subscription_expires_at || r.trial_ends_at || r.trial_expires_at || r.trial_end_at || r.trial_end || r.current_period_end || r.ends_at || r.end_at || null;
+ const trialEndsAt=r.trial_ends_at || r.trial_expires_at || r.trial_end_at || r.trial_end || r.trial_expires_on || r.trial_end_date || (explicitTrial?expiresAt:null);
+ const trialUsed=r.trial_used===true || r.trialUsed===true || !!r.trial_started_at || !!r.trial_start_at || !!r.trial_ends_at || !!r.trial_expires_at || !!r.trial_end_at || !!r.trial_end;
  const expiryMs=expiresAt?new Date(expiresAt).getTime():NaN;
  const futureExpiry=Number.isFinite(expiryMs) && expiryMs>Date.now();
- // Un statut pending reste pending tant que FedaPay n'a pas confirmé le paiement.
- // Mais pendant un essai encore valide, pending ne bloque absolument pas le compte.
+
+ // Une tentative pending n'interrompt jamais un essai valide.
  const pendingDuringTrial=status==="pending" && !everSubscribed && !!trialEndsAt && futureExpiry;
+ const isTrial=explicitTrial || (!everSubscribed && !!trialEndsAt) || pendingDuringTrial || (!everSubscribed && status==="active" && !!expiresAt);
+
  return {
    ...r,
    status:status||"inactive",
@@ -643,37 +648,45 @@ function normalizeSubscriptionRow(row){
    trial_used:trialUsed,
    pendingPayment:status==="pending" && !paymentConfirmed,
    pendingDuringTrial,
-   isTrial:explicitTrial || (!everSubscribed && !!trialEndsAt) || pendingDuringTrial || (!everSubscribed && status==="active" && !!expiresAt),
+   isTrial,
    startedAt:r.started_at||r.starts_at||r.paid_at||r.trial_started_at||r.trial_start_at||null,
    expiresAt,
    trialEndsAt
  };
 }
+
 function pickSubscriptionRow(rows){
  const list=(rows||[]).map(normalizeSubscriptionRow);
  if(!list.length)return {};
  const now=Date.now();
- // Priorité 1 : essai encore valide, même si une tentative FedaPay est pending.
- const liveTrial=list.find(s=>{
-   const d=s.trialEndsAt?s.trialEndsAt:s.expiresAt;
+ const liveExpiry=row=>{
+   const d=row?.expiresAt||row?.trialEndsAt;
    const t=d?new Date(d).getTime():NaN;
-   return s.isTrial===true && Number.isFinite(t) && t>now;
- });
- if(liveTrial)return liveTrial;
- // Priorité 2 : abonnement réellement confirmé et encore valide.
+   return Number.isFinite(t) && t>now;
+ };
+
+ // 1) Un abonnement réellement payé et encore valide est prioritaire.
+ //    Cela empêche un ancien trial de masquer un abonnement payé.
  const livePaid=list.find(s=>{
-   const d=s.expiresAt?new Date(s.expiresAt).getTime():NaN;
-   const future=d==null || d>now;
-   const paid=s.paymentConfirmed===true && future;
-   // Après un paiement déjà confirmé, une nouvelle tentative pending ne doit
-   // pas couper l'abonnement actuel tant que sa date d'expiration n'est pas atteinte.
-   const paidPeriod=s.everSubscribed===true && !s.isTrial && future && ["active","paid","approved","successful","success","renewed","active_paid","completed","pending"].includes(s.status);
-   return paid||paidPeriod;
+   const paidStatus=["active","paid","approved","successful","success","renewed","active_paid","completed"].includes(s.status);
+   return !s.isTrial && s.paymentConfirmed===true && paidStatus && liveExpiry(s);
  });
  if(livePaid)return livePaid;
- // Sinon on retourne la ligne la plus récente, qui sera notamment pending.
+
+ // 2) Un trial valide est prioritaire sur toute tentative FedaPay pending.
+ const liveTrial=list.find(s=>s.isTrial===true && !s.everSubscribed && liveExpiry(s));
+ if(liveTrial)return liveTrial;
+
+ // 3) Un abonnement payé encore valide peut être représenté par ever_subscribed=true
+ //    même si son statut est légèrement différent.
+ const paidByFlag=list.find(s=>s.everSubscribed===true && !s.isTrial && liveExpiry(s));
+ if(paidByFlag)return paidByFlag;
+
+ // 4) Aucun droit actif : conserver la ligne la plus récente pour afficher
+ //    proprement "Expiré" ou "Expiré — paiement en attente".
  return list[0];
 }
+
 function subscriptionDisplay(s){
  const x=normalizeSubscriptionRow(s);
  const now=new Date();
@@ -683,17 +696,41 @@ function subscriptionDisplay(s){
  const validTrialExpiry=trialExpiry&&!Number.isNaN(trialExpiry.getTime());
  const future=validExpiry && expiry>now;
  const trialFuture=validTrialExpiry && trialExpiry>now;
- const trialState=x.isTrial===true || ["trial","trialing","essai","free_trial","free-trial"].includes(x.status);
  const paidConfirmed=x.paymentConfirmed===true;
- const paidPeriod=x.everSubscribed===true && !x.isTrial && future && ["active","paid","approved","successful","success","renewed","active_paid","completed","pending"].includes(x.status);
- // Règle métier : pending n'annule jamais un trial valide.
- if(trialFuture && !paidConfirmed && !x.everSubscribed){
-   const ms=Math.max(0,trialExpiry-now); const days=Math.max(0,Math.ceil(ms/86400000));
-   return {key:"trial",label:"Essai",badge:"orange",date:"Essai + "+days+" "+(days===1?"jour":"jours"),remaining:"Lecture + écriture",active:true,canWrite:true,trial:true,trialUsed:false,pending:x.status==="pending"};
+ const paidActive=!x.isTrial && x.everSubscribed===true && paidConfirmed && future;
+
+ // Trial réel : accès complet pendant les 3 jours.
+ // Une tentative FedaPay pending ne change pas cet état.
+ if(x.isTrial===true && trialFuture && !paidConfirmed && !x.everSubscribed){
+   const ms=Math.max(0,trialExpiry-now);
+   const days=Math.max(0,Math.ceil(ms/86400000));
+   return {
+     key:"trial",label:"Essai",badge:"orange",
+     date:"Essai + "+days+" "+(days===1?"jour":"jours"),
+     remaining:"Lecture + écriture",active:true,canWrite:true,
+     trial:true,trialUsed:false,pending:x.pendingPayment===true,
+     expiresAt:trialExpiry.toISOString()
+   };
  }
- if(paidConfirmed || paidPeriod) return {key:"active",label:"Actif",badge:"green",date:validExpiry?"Actif jusqu'au "+fmt(x.expiresAt):"Actif",remaining:"Lecture + écriture",active:true,canWrite:true,trial:false,trialUsed:true};
- // Une fois le trial expiré, pending reste en attente et le compte passe en lecture seule.
- return {key:"expired",label:"Expiré",badge:"red",date:x.status==="pending"?"Expiré — paiement en attente":"Expiré",remaining:"Lecture seule — abonnement/essai expiré",active:false,canWrite:false,trial:false,trialUsed:!!x.trial_used,pending:x.status==="pending"};
+
+ // Abonnement payé et confirmé.
+ if(paidActive){
+   return {
+     key:"active",label:"Actif",badge:"green",
+     date:validExpiry?"Actif jusqu'au "+fmt(x.expiresAt):"Actif",
+     remaining:"Lecture + écriture",active:true,canWrite:true,
+     trial:false,trialUsed:true,pending:false
+   };
+ }
+
+ // Trial expiré ou abonnement expiré : lecture seule.
+ return {
+   key:"expired",label:"Expiré",badge:"red",
+   date:x.status==="pending"?"Expiré — paiement en attente":"Expiré",
+   remaining:"Lecture seule — abonnement/essai expiré",
+   active:false,canWrite:false,trial:false,trialUsed:!!x.trial_used,
+   pending:x.pendingPayment===true
+ };
 }
 function currentSubscriptionState(){
  const kind=mpAccountKind();
@@ -1105,11 +1142,13 @@ async function mpLoadFromSupabase(){
   };
   let earlySub=findSubEarly(ownCandidatesEarly,normalizedAccountType==="merchant"?"merchant":"agent");
   if(!earlySub || !Object.keys(earlySub).length) earlySub=pickSubscriptionRow(ownCandidatesEarly)||{};
-  // Toujours fusionner les métadonnées du profil, même lorsqu'une ligne
-  // subscriptions existe. Ainsi "pending" + essai configuré sur profiles
-  // donne bien l'état d'essai et non un abonnement vide/expiré.
+  // Les métadonnées du profil servent uniquement de secours pour les champs
+  // absents. Elles ne doivent jamais écraser une ligne subscriptions réelle
+  // (notamment un trial valide avec une tentative FedaPay pending).
   if(Object.keys(profileSubMeta).length){
-    earlySub={...earlySub,...profileSubMeta};
+    for(const [k,v] of Object.entries(profileSubMeta)){
+      if(earlySub[k]===undefined || earlySub[k]===null || earlySub[k]==="") earlySub[k]=v;
+    }
   }
   const earlyPrice=normalizedAccountType==="merchant" ? (earlySub.everSubscribed?2000:1000) : normalizedAccountType==="agent_attached" ? 500 : 1000;
   data.subscription={...normalizeSubscriptionRow(earlySub),price:earlyPrice};
@@ -1302,11 +1341,13 @@ async function mpLoadFromSupabase(){
         ? 1000
         : null;
   if(rolePrice===null) throw new Error("Type de compte Supabase non pris en charge.");
-  // Si le profil porte directement les métadonnées d'essai et qu'aucune ligne
-  // d'abonnement exploitable n'a été trouvée, les utiliser comme dernier recours.
+  // Les métadonnées du profil complètent uniquement les champs absents.
+  // Une ligne subscriptions réelle reste toujours la source prioritaire.
   let resolvedSub={...(ownSub||{})};
   if(Object.keys(profileSubMeta).length){
-    resolvedSub={...resolvedSub,...profileSubMeta};
+    for(const [k,v] of Object.entries(profileSubMeta)){
+      if(resolvedSub[k]===undefined || resolvedSub[k]===null || resolvedSub[k]==="") resolvedSub[k]=v;
+    }
   }
   data.subscription={
     ...normalizeSubscriptionRow(resolvedSub),
