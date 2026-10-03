@@ -1930,14 +1930,14 @@ if(mpSupabase){
         if(!managed || managed.profile?.account_type!=="agent_attached"){
           throw new Error("L'agent sélectionné n'est pas un agent rattaché.");
         }
-        amount=500; accountType="agent"; accountName=managed.name||"";
+        amount=500; accountType="agent_attached"; accountName=managed.name||"";
       }else if(callerIsMerchant){
         amount=data.subscription?.everSubscribed?2000:1000;
         accountType="merchant"; accountName=data.profile?.name||"";
       }else if(callerIsAttached){
-        amount=500; accountType="agent"; accountName=data.profile?.name||"";
+        amount=500; accountType="agent_attached"; accountName=data.profile?.name||"";
       }else if(callerIsIndependent){
-        amount=1000; accountType="agent"; accountName=data.profile?.name||"";
+        amount=1000; accountType="agent_independent"; accountName=data.profile?.name||"";
       }else{
         throw new Error("Type de compte Supabase non reconnu.");
       }
